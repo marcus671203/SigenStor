@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sigen">
+<title>Sigen</title>
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+:root {
+  --bg: #F2F2F7; --card: #FFFFFF; --card-2: #F7F7FB;
+  --text: #1C1C1E; --text-2: #6E6E73; --text-3: #A1A1AA;
+  --border: #E5E5EA; --accent: #185FA5;
+  --accent-grad: linear-gradient(135deg, #185FA5 0%, #2E7BC7 100%);
+  --green: #1D9E75; --orange: #BA7517; --purple: #534AB7; --red: #D33B33;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #000; --card: #1C1C1E; --card-2: #2C2C2E; --text: #FFF; --text-2: #98989D; --text-3: #636366; --border: #38383A; }
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+.app { max-width: 430px; margin: 0 auto; padding: 16px 16px 100px; }
+.header { display: flex; justify-content: space-between; align-items: center; padding: 12px 4px 20px; }
+.header .date-label { font-size: 11px; color: var(--text-3); font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; }
+.header .date-main { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; margin-top: 2px; }
+.live-badge { display: flex; align-items: center; gap: 6px; background: var(--card); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); cursor: pointer; }
+.live-dot { width: 8px; height: 8px; background: var(--green); border-radius: 50%; box-shadow: 0 0 0 3px rgba(29,158,117,0.2); animation: pulse 2s infinite; }
+.live-dot.stale { background: var(--orange); animation: none; }
+.live-dot.error { background: var(--red); animation: none; }
+@keyframes pulse { 0%,100% { box-shadow: 0 0 0 3px rgba(29,158,117,0.2); } 50% { box-shadow: 0 0 0 6px rgba(29,158,117,0.1); } }
+.live-badge span { font-size: 12px; font-weight: 600; }
+.hero { background: var(--accent-grad); color: white; border-radius: 24px; padding: 22px 20px; margin-bottom: 14px; box-shadow: 0 8px 24px rgba(24,95,165,0.18); }
+.hero-label { font-size: 13px; opacity: 0.88; letter-spacing: 0.2px; margin-bottom: 4px; }
+.hero-value { font-size: 44px; font-weight: 700; line-height: 1; letter-spacing: -1px; margin-bottom: 16px; }
+.hero-value .unit { font-size: 22px; opacity: 0.88; font-weight: 600; }
+.hero-breakdown { display: flex; gap: 18px; font-size: 13px; }
+.hero-breakdown .item { display: flex; align-items: center; gap: 6px; }
+.hero-breakdown .item span { opacity: 0.88; }
+.hero-breakdown .item strong { font-weight: 700; }
+.card { background: var(--card); border-radius: 20px; padding: 16px; margin-bottom: 14px; }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.card-title { font-size: 14px; font-weight: 600; }
+.card-meta { font-size: 11px; color: var(--text-3); font-style: italic; }
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.stat { background: var(--card-2); padding: 12px 14px; border-radius: 14px; }
+.stat-label-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.stat-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.stat-dot.sol { background: var(--orange); }
+.stat-dot.last { background: var(--purple); }
+.stat-dot.bat { background: var(--green); }
+.stat-dot.nat { background: var(--text-3); }
+.stat-label { font-size: 11px; color: var(--text-2); font-weight: 500; }
+.stat-value { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+.stat-value .stat-unit { font-size: 13px; color: var(--text-3); font-weight: 500; }
+.progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--green); border-radius: 2px; transition: width 0.4s; }
+.bars { display: flex; align-items: flex-end; gap: 6px; height: 84px; }
+.bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.bar { width: 100%; background: var(--accent); border-radius: 4px 4px 0 0; opacity: 0.85; min-height: 4px; }
+.bar.today { background: var(--green); opacity: 1; }
+.bar-label { font-size: 10px; color: var(--text-3); font-weight: 500; }
+.bar-label.today { color: var(--green); font-weight: 700; }
+.quick-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.quick-stat { background: var(--card); border-radius: 18px; padding: 14px; }
+.quick-stat-label { font-size: 10px; color: var(--text-3); font-weight: 600; letter-spacing: 0.3px; margin-bottom: 3px; }
+.quick-stat-value { font-size: 22px; font-weight: 700; line-height: 1.1; letter-spacing: -0.3px; }
+.quick-stat-value .unit { font-size: 12px; color: var(--text-3); font-weight: 500; }
+.quick-stat-sub { font-size: 11px; margin-top: 5px; color: var(--text-3); }
+.insight { background: rgba(186,117,23,0.1); border-radius: 16px; padding: 14px; display: flex; gap: 10px; align-items: flex-start; margin-bottom: 14px; }
+.insight-icon { font-size: 18px; flex-shrink: 0; }
+.insight-text { font-size: 12px; line-height: 1.45; color: var(--text-2); }
+.insight-text strong { color: var(--text); font-weight: 700; display: block; margin-bottom: 2px; }
+.error-banner { background: rgba(211,59,51,0.1); border: 1px solid rgba(211,59,51,0.3); color: var(--red); padding: 12px 14px; border-radius: 12px; margin-bottom: 14px; font-size: 12px; }
+.nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card); border-top: 0.5px solid var(--border); padding: 10px env(safe-area-inset-right) calc(8px + env(safe-area-inset-bottom)) env(safe-area-inset-left); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+.nav-inner { max-width: 430px; margin: 0 auto; display: flex; justify-content: space-around; }
+.nav-item { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 12px; color: var(--text-3); cursor: pointer; }
+.nav-item.active { color: var(--accent); }
+.nav-label { font-size: 10px; font-weight: 600; }
+.ico { width: 22px; height: 22px; display: block; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div>
+      <div class="date-label" id="date-label">—</div>
+      <div class="date-main" id="date-main">Laddar…</div>
+    </div>
+    <div class="live-badge" id="live-badge" onclick="refresh()">
+      <span class="live-dot" id="live-dot"></span>
+      <span id="live-text">Laddar</span>
+    </div>
+  </div>
+  <div id="error-banner" class="error-banner" style="display:none;"></div>
+  <div class="hero">
+    <div class="hero-label">Besparing idag</div>
+    <div class="hero-value" id="savings-total">—<span class="unit"> kr</span></div>
+    <div class="hero-breakdown">
+      <div class="item"><span>☀ Sol</span><strong id="savings-sol">—</strong></div>
+      <div class="item"><span>⚡ Bat</span><strong id="savings-bat">—</strong></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title" id="now-title">Just nu — —</div>
+      <div class="card-meta" id="now-mode">—</div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat"><div class="stat-label-row"><span class="stat-dot sol"></span><span class="stat-label">Sol</span></div><div class="stat-value" id="now-sol">— <span class="stat-unit">kW</span></div></div>
+      <div class="stat"><div class="stat-label-row"><span class="stat-dot last"></span><span class="stat-label">Last</span></div><div class="stat-value" id="now-last">— <span class="stat-unit">kW</span></div></div>
+      <div class="stat"><div class="stat-label-row"><span class="stat-dot bat"></span><span class="stat-label">Batteri</span></div
