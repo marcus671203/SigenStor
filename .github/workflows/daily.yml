@@ -1,0 +1,44 @@
+name: Daglig aggregering
+
+on:
+  schedule:
+    - cron: '15 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  daily:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Hamta repo
+        uses: actions/checkout@v4
+
+      - name: Satt upp Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Installera paket
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Aggregera gardagen
+        run: python scripts/daily.py
+
+      - name: Committa
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if ! git diff --staged --quiet; then
+            git commit -m "Daglig aggregering $(date -u +'%Y-%m-%d')"
+            git pull --rebase --autostash
+            git push
+          else
+            echo "Inga andringar"
+          fi
