@@ -1,0 +1,11 @@
+{
+  "name": "Sigen",
+  "short_name": "Sigen",
+  "description": "Energibesparing från Sigenergy",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#185FA5",
+  "orientation": "portrait"
+}
