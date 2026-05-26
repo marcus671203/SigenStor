@@ -110,4 +110,167 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica
     <div class="stats-grid">
       <div class="stat"><div class="stat-label-row"><span class="stat-dot sol"></span><span class="stat-label">Sol</span></div><div class="stat-value" id="now-sol">— <span class="stat-unit">kW</span></div></div>
       <div class="stat"><div class="stat-label-row"><span class="stat-dot last"></span><span class="stat-label">Last</span></div><div class="stat-value" id="now-last">— <span class="stat-unit">kW</span></div></div>
-      <div class="stat"><div class="stat-label-row"><span class="stat-dot bat"></span><span class="stat-label">Batteri</span></div
+      <div class="stat"><div class="stat-label-row"><span class="stat-dot bat"></span><span class="stat-label">Batteri</span></div><div class="stat-value" id="now-soc">— <span class="stat-unit">%</span></div><div class="progress-bar"><div class="progress-fill" id="now-soc-bar" style="width: 0%"></div></div></div>
+      <div class="stat"><div class="stat-label-row"><span class="stat-dot nat"></span><span class="stat-label">Nät</span></div><div class="stat-value" id="now-grid">— <span class="stat-unit">kW</span></div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Senaste 7 dagarna</div>
+      <div class="card-meta" id="week-total" style="color: var(--text-2); font-style: normal; font-weight: 500;">— kr</div>
+    </div>
+    <div class="bars" id="week-bars"></div>
+  </div>
+  <div class="quick-stats">
+    <div class="quick-stat">
+      <div class="quick-stat-label" id="month-label">DENNA MÅNAD</div>
+      <div class="quick-stat-value" id="month-value">— <span class="unit">kr</span></div>
+      <div class="quick-stat-sub" id="month-sub">—</div>
+    </div>
+    <div class="quick-stat">
+      <div class="quick-stat-label">SEDAN START</div>
+      <div class="quick-stat-value" id="grand-value">— <span class="unit">kr</span></div>
+      <div class="quick-stat-sub" id="grand-sub">—</div>
+    </div>
+  </div>
+  <div class="insight" id="insight">
+    <span class="insight-icon">💡</span>
+    <div class="insight-text">
+      <strong id="insight-title">Hämtar status…</strong>
+      <span id="insight-body">Appen läser data direkt från ditt GitHub-repo.</span>
+    </div>
+  </div>
+</div>
+<div class="nav">
+  <div class="nav-inner">
+    <div class="nav-item active"><div class="nav-label">Idag</div></div>
+    <div class="nav-item"><div class="nav-label">Historik</div></div>
+    <div class="nav-item"><div class="nav-label">Insikter</div></div>
+    <div class="nav-item" onclick="refresh()"><div class="nav-label">Uppdatera</div></div>
+  </div>
+</div>
+<script>
+const CONFIG = { basePath: '..', refreshSeconds: 60 };
+const DAYS = ['sön','mån','tis','ons','tor','fre','lör'];
+const MONTHS_LONG = ['januari','februari','mars','april','maj','juni','juli','augusti','september','oktober','november','december'];
+
+function fmt(v, d=2) { return (v==null||isNaN(v)) ? '—' : v.toFixed(d).replace('.', ','); }
+function fmtInt(v) { return (v==null||isNaN(v)) ? '—' : Math.round(v).toLocaleString('sv-SE'); }
+
+function setStatus(state, text) {
+  document.getElementById('live-dot').className = 'live-dot' + (state==='ok' ? '' : ' '+state);
+  document.getElementById('live-text').textContent = text;
+}
+function showError(msg) { const el=document.getElementById('error-banner'); el.textContent=msg; el.style.display='block'; }
+function hideError() { document.getElementById('error-banner').style.display='none'; }
+
+async function fetchJSON(path) {
+  const r = await fetch(`${CONFIG.basePath}/${path}?t=${Date.now()}`, { cache:'no-store' });
+  if (!r.ok) throw new Error(`${r.status} ${path}`);
+  return r.json();
+}
+async function fetchText(path) {
+  const r = await fetch(`${CONFIG.basePath}/${path}?t=${Date.now()}`, { cache:'no-store' });
+  if (!r.ok) throw new Error(`${r.status} ${path}`);
+  return r.text();
+}
+
+function updateHeader() {
+  const n = new Date();
+  document.getElementById('date-label').textContent = DAYS[n.getDay()]+'dag';
+  document.getElementById('date-main').textContent = `${n.getDate()} ${MONTHS_LONG[n.getMonth()]}`;
+}
+
+async function loadLatest() {
+  const ymd = new Date().toISOString().slice(0,10);
+  const text = await fetchText(`data/raw/${ymd}.jsonl`);
+  const lines = text.trim().split('\n').filter(Boolean);
+  if (!lines.length) throw new Error('Tom fil');
+  return JSON.parse(lines[lines.length-1]);
+}
+
+async function loadSummary() {
+  try { return await fetchJSON('data/summary.json'); } catch { return null; }
+}
+
+function renderNow(latest) {
+  const f = latest.flow;
+  const ts = new Date(latest.ts_local);
+  const hh = String(ts.getHours()).padStart(2,'0');
+  const mm = String(ts.getMinutes()).padStart(2,'0');
+  document.getElementById('now-title').textContent = `Just nu — ${hh}:${mm}`;
+  document.getElementById('now-mode').textContent = latest.mode || '—';
+  const sol = (f.pvPower||0) + (f.thirdPvPower||0);
+  document.getElementById('now-sol').innerHTML = `${fmt(sol)} <span class="stat-unit">kW</span>`;
+  document.getElementById('now-last').innerHTML = `${fmt(f.loadPower)} <span class="stat-unit">kW</span>`;
+  const soc = f.batterySoc||0;
+  document.getElementById('now-soc').innerHTML = `${fmt(soc,0)} <span class="stat-unit">%</span>`;
+  document.getElementById('now-soc-bar').style.width = `${soc}%`;
+  document.getElementById('now-grid').innerHTML = `${fmt(f.buySellPower||0)} <span class="stat-unit">kW</span>`;
+  const ageMin = (Date.now()-ts.getTime())/60000;
+  if (ageMin<8) setStatus('ok','Live');
+  else if (ageMin<30) setStatus('stale', `${Math.round(ageMin)} min`);
+  else setStatus('error', `${Math.round(ageMin)} min`);
+}
+
+function renderSummary(s) {
+  if (!s) {
+    document.getElementById('insight-title').textContent = 'Ingen aggregering ännu';
+    document.getElementById('insight-body').textContent = 'Daglig sammanfattning skapas kl 03 imorgon.';
+    return;
+  }
+  document.getElementById('grand-value').innerHTML = `${fmtInt(s.grand_total_kr)} <span class="unit">kr</span>`;
+  document.getElementById('grand-sub').textContent = `${s.total_days} dagar`;
+  const now = new Date();
+  const tm = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const mr = (s.monthly||[]).find(m=>m.month===tm);
+  document.getElementById('month-label').textContent = MONTHS_LONG[now.getMonth()].toUpperCase()+' '+now.getFullYear();
+  if (mr) {
+    document.getElementById('month-value').innerHTML = `${fmtInt(mr.total_kr)} <span class="unit">kr</span>`;
+    const days = (s.last_30_days||[]).filter(d=>d.date.startsWith(tm)).length;
+    document.getElementById('month-sub').textContent = `▲ ${fmt(days>0?mr.total_kr/days:0,0)} kr/dag`;
+  }
+  const ts = now.toISOString().slice(0,10);
+  const tr = (s.last_30_days||[]).find(d=>d.date===ts);
+  if (tr) {
+    document.getElementById('savings-total').innerHTML = `${fmt(tr.total_kr)}<span class="unit"> kr</span>`;
+    document.getElementById('savings-sol').textContent = fmt(tr.sol_kr);
+    document.getElementById('savings-bat').textContent = fmt(tr.bat_kr);
+  }
+  const l7 = (s.last_30_days||[]).slice(-7);
+  if (l7.length) {
+    const max = Math.max(...l7.map(d=>d.total_kr),1);
+    let t7 = 0;
+    document.getElementById('week-bars').innerHTML = l7.map(d=>{
+      t7 += d.total_kr;
+      const dt = new Date(d.date);
+      const it = d.date===ts;
+      const h = Math.max(4, (d.total_kr/max)*70);
+      return `<div class="bar-col"><div class="bar${it?' today':''}" style="height:${h}px"></div><div class="bar-label${it?' today':''}">${it?'idag':DAYS[dt.getDay()]+' '+dt.getDate()}</div></div>`;
+    }).join('');
+    document.getElementById('week-total').textContent = `${fmtInt(t7)} kr`;
+  }
+  if (tr) {
+    document.getElementById('insight-title').textContent = 'Beräkning klar!';
+    document.getElementById('insight-body').textContent = `Idag har du sparat ${fmt(tr.total_kr)} kr.`;
+  }
+}
+
+async function refresh() {
+  setStatus('stale','Hämtar…');
+  hideError();
+  updateHeader();
+  try {
+    const [l,s] = await Promise.allSettled([loadLatest(), loadSummary()]);
+    if (l.status==='fulfilled') renderNow(l.value);
+    else { setStatus('error','Fel'); showError('Kunde inte hämta senaste pollning.'); }
+    if (s.status==='fulfilled') renderSummary(s.value);
+  } catch(e) { setStatus('error','Fel'); showError('Fel: '+e.message); }
+}
+
+refresh();
+setInterval(refresh, CONFIG.refreshSeconds*1000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) refresh(); });
+</script>
+</body>
+</html>
