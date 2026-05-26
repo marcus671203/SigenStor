@@ -1,0 +1,6 @@
+sigen>=3.0.0
+aiohttp>=3.9.0
+pycryptodome>=3.20.0
+requests>=2.31.0
+pandas>=2.2.0
+openpyxl>=3.1.0
