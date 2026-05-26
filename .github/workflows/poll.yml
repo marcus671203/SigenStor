@@ -2,7 +2,7 @@ name: Sigen Poll
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '*/10 * * * *'
   workflow_dispatch:
 
 concurrency:
@@ -16,7 +16,6 @@ jobs:
   poll:
     runs-on: ubuntu-latest
     timeout-minutes: 4
-
     steps:
       - name: Hamta repo
         uses: actions/checkout@v4
@@ -38,27 +37,26 @@ jobs:
           SIGEN_REGION: eu
         run: python scripts/poll.py
 
-     - name: Committa nya datapunkter
+      - name: Committa nya datapunkter
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           for i in 1 2 3 4 5; do
-            # Stash bort lokala ändringar, pulla remote, applicera lokalt igen
             git add data/
             if git diff --staged --quiet; then
               echo "Inga nya datapunkter"
               exit 0
             fi
             git stash
-            git pull origin main --no-rebase --strategy=ours --no-edit 2>/dev/null || git pull origin main
+            git pull origin main --no-rebase 2>/dev/null || true
             git stash pop || true
             git add data/
             git commit -m "Sigen-data $(date -u +'%Y-%m-%d %H:%M UTC')" || true
-            if git push; then
+            if git push 2>/dev/null; then
               echo "Push lyckades"
               exit 0
             fi
-            echo "Push misslyckades, försök $i"
+            echo "Push misslyckades, forsok $i"
             sleep $((i * 3))
           done
           exit 1
