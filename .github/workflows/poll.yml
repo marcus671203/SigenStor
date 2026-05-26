@@ -38,15 +38,33 @@ jobs:
           SIGEN_REGION: eu
         run: python scripts/poll.py
 
-      - name: Committa nya datapunkter
+- name: Committa nya datapunkter
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/
-          if ! git diff --staged --quiet; then
+          # Försök upp till 3 gånger - om någon annan committat samtidigt
+          for i in 1 2 3; do
+            git add data/
+            if git diff --staged --quiet; then
+              echo "Inga nya datapunkter att committa"
+              exit 0
+            fi
             git commit -m "Sigen-data $(date -u +'%Y-%m-%d %H:%M UTC')"
-            git pull --rebase --autostash
-            git push
-          else
-            echo "Inga nya datapunkter att committa"
-          fi
+            # Hämta senaste från remote
+            git fetch origin main
+            # Om konflikt i JSONL: behåll BÅDA ändringar (append-mode)
+            if ! git merge origin/main --no-edit -X theirs 2>/dev/null; then
+              # Vid konflikt: hämta nya rader från oss och deras, sortera
+              git checkout --theirs data/raw/*.jsonl 2>/dev/null || true
+              git add data/
+              git commit -m "Merge sigen-data $(date -u +'%Y-%m-%d %H:%M UTC')" --no-edit || true
+            fi
+            if git push; then
+              echo "Push lyckades på försök $i"
+              exit 0
+            fi
+            echo "Push misslyckades på försök $i, väntar..."
+            sleep $((i * 5))
+          done
+          echo "Kunde inte pusha efter 3 försök"
+          exit 1
