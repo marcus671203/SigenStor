@@ -1,4 +1,4 @@
-name: Poll Sigen var 5 min
+name: Sigen poller
 
 on:
   schedule:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: poll-sigen
+  group: sigen-poller
   cancel-in-progress: false
 
 permissions:
