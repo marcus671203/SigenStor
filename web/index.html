@@ -3,274 +3,595 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#185FA5">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Sigen">
-<title>Sigen</title>
-<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-title" content="SigenStor">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<title>SigenStor</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-:root {
-  --bg: #F2F2F7; --card: #FFFFFF; --card-2: #F7F7FB;
-  --text: #1C1C1E; --text-2: #6E6E73; --text-3: #A1A1AA;
-  --border: #E5E5EA; --accent: #185FA5;
-  --accent-grad: linear-gradient(135deg, #185FA5 0%, #2E7BC7 100%);
-  --green: #1D9E75; --orange: #BA7517; --purple: #534AB7; --red: #D33B33;
+html, body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+  background: #f5f5f7;
+  color: #1d1d1f;
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
-@media (prefers-color-scheme: dark) {
-  :root { --bg: #000; --card: #1C1C1E; --card-2: #2C2C2E; --text: #FFF; --text-2: #98989D; --text-3: #636366; --border: #38383A; }
+.app { max-width: 480px; margin: 0 auto; padding: 16px; }
+
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding: 8px 4px; }
+.header h1 { font-size: 14px; color: #6e6e73; font-weight: 400; }
+.header .subtitle { font-size: 20px; font-weight: 600; color: #1d1d1f; }
+.header .time { font-size: 12px; color: #86868b; }
+.refresh-btn {
+  background: none; border: none; color: #185FA5; font-size: 14px;
+  cursor: pointer; padding: 4px 8px; border-radius: 8px;
 }
-body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); overflow-x: hidden; -webkit-font-smoothing: antialiased; }
-.app { max-width: 430px; margin: 0 auto; padding: 16px 16px 100px; }
-.header { display: flex; justify-content: space-between; align-items: center; padding: 12px 4px 20px; }
-.header .date-label { font-size: 11px; color: var(--text-3); font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; }
-.header .date-main { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; margin-top: 2px; }
-.live-badge { display: flex; align-items: center; gap: 6px; background: var(--card); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); cursor: pointer; }
-.live-dot { width: 8px; height: 8px; background: var(--green); border-radius: 50%; box-shadow: 0 0 0 3px rgba(29,158,117,0.2); animation: pulse 2s infinite; }
-.live-dot.stale { background: var(--orange); animation: none; }
-.live-dot.error { background: var(--red); animation: none; }
-@keyframes pulse { 0%,100% { box-shadow: 0 0 0 3px rgba(29,158,117,0.2); } 50% { box-shadow: 0 0 0 6px rgba(29,158,117,0.1); } }
-.live-badge span { font-size: 12px; font-weight: 600; }
-.hero { background: var(--accent-grad); color: white; border-radius: 24px; padding: 22px 20px; margin-bottom: 14px; box-shadow: 0 8px 24px rgba(24,95,165,0.18); }
-.hero-label { font-size: 13px; opacity: 0.88; letter-spacing: 0.2px; margin-bottom: 4px; }
-.hero-value { font-size: 44px; font-weight: 700; line-height: 1; letter-spacing: -1px; margin-bottom: 16px; }
-.hero-value .unit { font-size: 22px; opacity: 0.88; font-weight: 600; }
-.hero-breakdown { display: flex; gap: 18px; font-size: 13px; }
-.hero-breakdown .item { display: flex; align-items: center; gap: 6px; }
-.hero-breakdown .item span { opacity: 0.88; }
-.hero-breakdown .item strong { font-weight: 700; }
-.card { background: var(--card); border-radius: 20px; padding: 16px; margin-bottom: 14px; }
-.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-.card-title { font-size: 14px; font-weight: 600; }
-.card-meta { font-size: 11px; color: var(--text-3); font-style: italic; }
-.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.stat { background: var(--card-2); padding: 12px 14px; border-radius: 14px; }
-.stat-label-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
-.stat-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.stat-dot.sol { background: var(--orange); }
-.stat-dot.last { background: var(--purple); }
-.stat-dot.bat { background: var(--green); }
-.stat-dot.nat { background: var(--text-3); }
-.stat-label { font-size: 11px; color: var(--text-2); font-weight: 500; }
-.stat-value { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
-.stat-value .stat-unit { font-size: 13px; color: var(--text-3); font-weight: 500; }
-.progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin-top: 8px; overflow: hidden; }
-.progress-fill { height: 100%; background: var(--green); border-radius: 2px; transition: width 0.4s; }
-.bars { display: flex; align-items: flex-end; gap: 6px; height: 84px; }
-.bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; }
-.bar { width: 100%; background: var(--accent); border-radius: 4px 4px 0 0; opacity: 0.85; min-height: 4px; }
-.bar.today { background: var(--green); opacity: 1; }
-.bar-label { font-size: 10px; color: var(--text-3); font-weight: 500; }
-.bar-label.today { color: var(--green); font-weight: 700; }
-.quick-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
-.quick-stat { background: var(--card); border-radius: 18px; padding: 14px; }
-.quick-stat-label { font-size: 10px; color: var(--text-3); font-weight: 600; letter-spacing: 0.3px; margin-bottom: 3px; }
-.quick-stat-value { font-size: 22px; font-weight: 700; line-height: 1.1; letter-spacing: -0.3px; }
-.quick-stat-value .unit { font-size: 12px; color: var(--text-3); font-weight: 500; }
-.quick-stat-sub { font-size: 11px; margin-top: 5px; color: var(--text-3); }
-.insight { background: rgba(186,117,23,0.1); border-radius: 16px; padding: 14px; display: flex; gap: 10px; align-items: flex-start; margin-bottom: 14px; }
-.insight-icon { font-size: 18px; flex-shrink: 0; }
-.insight-text { font-size: 12px; line-height: 1.45; color: var(--text-2); }
-.insight-text strong { color: var(--text); font-weight: 700; display: block; margin-bottom: 2px; }
-.error-banner { background: rgba(211,59,51,0.1); border: 1px solid rgba(211,59,51,0.3); color: var(--red); padding: 12px 14px; border-radius: 12px; margin-bottom: 14px; font-size: 12px; }
-.nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card); border-top: 0.5px solid var(--border); padding: 10px env(safe-area-inset-right) calc(8px + env(safe-area-inset-bottom)) env(safe-area-inset-left); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
-.nav-inner { max-width: 430px; margin: 0 auto; display: flex; justify-content: space-around; }
-.nav-item { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 12px; color: var(--text-3); cursor: pointer; }
-.nav-item.active { color: var(--accent); }
-.nav-label { font-size: 10px; font-weight: 600; }
-.ico { width: 22px; height: 22px; display: block; }
+.refresh-btn:active { background: rgba(24,95,165,0.1); }
+
+.card {
+  background: #ffffff; border-radius: 16px; padding: 20px;
+  margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.hero {
+  background: linear-gradient(135deg, #185FA5 0%, #1e7bc8 100%);
+  color: white; border-radius: 16px; padding: 24px; margin-bottom: 12px;
+}
+.hero .label { font-size: 13px; opacity: 0.85; }
+.hero .value { font-size: 42px; font-weight: 600; margin: 4px 0 12px; }
+.hero .bar { height: 8px; background: rgba(255,255,255,0.25); border-radius: 4px; overflow: hidden; }
+.hero .bar-fill { height: 100%; background: white; border-radius: 4px; transition: width 0.4s; }
+
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.tile {
+  background: white; border-radius: 12px; padding: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.tile .label { font-size: 11px; color: #6e6e73; text-transform: uppercase; letter-spacing: 0.5px; }
+.tile .value { font-size: 22px; font-weight: 600; margin-top: 2px; }
+.tile .unit { font-size: 13px; color: #86868b; font-weight: 400; }
+.tile.active .value { color: #D4537E; }
+
+.mode-card {
+  display: flex; justify-content: space-between; align-items: center;
+  background: white; border-radius: 12px; padding: 14px 16px; margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.mode-card .label { font-size: 11px; color: #6e6e73; text-transform: uppercase; letter-spacing: 0.5px; }
+.mode-card .value { font-size: 14px; font-weight: 500; }
+
+.section-title {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 8px 4px 12px;
+}
+.section-title .title { font-size: 15px; font-weight: 600; }
+.section-title .sub { font-size: 11px; color: #86868b; }
+
+/* Day navigator */
+.day-nav {
+  display: flex; justify-content: space-between; align-items: center;
+  background: white; border-radius: 12px; padding: 10px 14px; margin-bottom: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  gap: 8px;
+}
+.day-nav-btn {
+  background: #f5f5f7; border: none; color: #185FA5;
+  width: 32px; height: 32px; border-radius: 8px;
+  font-size: 18px; font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.day-nav-btn:active { background: #e5e5ea; }
+.day-nav-btn:disabled { opacity: 0.3; cursor: default; }
+.day-nav-date {
+  flex: 1; text-align: center; font-size: 14px; font-weight: 600;
+  position: relative; color: #185FA5;
+}
+.day-nav-date input {
+  position: absolute; opacity: 0; left: 0; top: 0;
+  width: 100%; height: 100%; cursor: pointer;
+}
+.day-nav-today-btn {
+  background: #185FA5; color: white; border: none;
+  padding: 6px 10px; border-radius: 8px; font-size: 12px;
+  font-weight: 500; cursor: pointer; flex-shrink: 0;
+}
+.day-nav-today-btn:active { background: #134a82; }
+.day-nav-today-btn:disabled { opacity: 0.4; cursor: default; background: #86868b; }
+
+.chart { display: flex; gap: 4px; align-items: flex-end; height: 100px; margin-top: 4px; }
+.bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.bar-col .bar { width: 100%; background: #97C459; border-radius: 4px; min-height: 4px; }
+.bar-col .bar.high { background: #639922; }
+.bar-col .lbl { font-size: 10px; color: #86868b; }
+.bar-col .amt { font-size: 9px; color: #6e6e73; margin-bottom: 2px; }
+
+.stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding-top: 12px; border-top: 1px solid #e5e5ea; }
+.stats .stat .label { font-size: 11px; color: #6e6e73; }
+.stats .stat .value { font-size: 15px; font-weight: 600; color: #185FA5; margin-top: 2px; }
+
+.footer { text-align: center; padding: 24px 0 16px; font-size: 11px; color: #86868b; }
+.footer .updated { margin-top: 4px; }
+
+.loading { color: #86868b; font-size: 14px; }
+.error { color: #d92626; font-size: 13px; padding: 8px; }
+
+/* 5-min flow chart */
+.flow-card { padding: 16px 12px 12px 12px; }
+.flow-chart { width: 100%; height: 200px; }
+.flow-legend {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  justify-content: center; padding-top: 8px;
+  font-size: 11px; color: #6e6e73;
+}
+.legend-item { display: flex; align-items: center; gap: 4px; }
+.legend-swatch { width: 12px; height: 4px; border-radius: 2px; }
+
+.day-savings {
+  display: flex; justify-content: space-around; align-items: center;
+  padding: 12px 0 8px 0; border-top: 1px solid #e5e5ea; margin-top: 8px;
+}
+.day-savings .item { text-align: center; }
+.day-savings .item .label { font-size: 10px; color: #6e6e73; text-transform: uppercase; letter-spacing: 0.5px; }
+.day-savings .item .value { font-size: 15px; font-weight: 600; margin-top: 2px; }
+.day-savings .item .value.sol { color: #E8B91A; }
+.day-savings .item .value.bat { color: #8E5BBC; }
+.day-savings .item .value.total { color: #185FA5; }
+
+.day-kwh {
+  display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 4px;
+  padding-top: 10px;
+  border-top: 1px solid #e5e5ea;
+}
+.day-kwh .item { text-align: center; }
+.day-kwh .item .label { font-size: 9px; color: #6e6e73; }
+.day-kwh .item .value { font-size: 13px; font-weight: 500; color: #1d1d1f; margin-top: 2px; }
 </style>
 </head>
 <body>
 <div class="app">
-  <div class="header">
-    <div>
-      <div class="date-label" id="date-label">—</div>
-      <div class="date-main" id="date-main">Laddar…</div>
-    </div>
-    <div class="live-badge" id="live-badge" onclick="refresh()">
-      <span class="live-dot" id="live-dot"></span>
-      <span id="live-text">Laddar</span>
-    </div>
-  </div>
-  <div id="error-banner" class="error-banner" style="display:none;"></div>
-  <div class="hero">
-    <div class="hero-label">Besparing idag</div>
-    <div class="hero-value" id="savings-total">—<span class="unit"> kr</span></div>
-    <div class="hero-breakdown">
-      <div class="item"><span>☀ Sol</span><strong id="savings-sol">—</strong></div>
-      <div class="item"><span>⚡ Bat</span><strong id="savings-bat">—</strong></div>
-    </div>
-  </div>
-  <div class="card">
-    <div class="card-header">
-      <div class="card-title" id="now-title">Just nu — —</div>
-      <div class="card-meta" id="now-mode">—</div>
-    </div>
-    <div class="stats-grid">
-      <div class="stat"><div class="stat-label-row"><span class="stat-dot sol"></span><span class="stat-label">Sol</span></div><div class="stat-value" id="now-sol">— <span class="stat-unit">kW</span></div></div>
-      <div class="stat"><div class="stat-label-row"><span class="stat-dot last"></span><span class="stat-label">Last</span></div><div class="stat-value" id="now-last">— <span class="stat-unit">kW</span></div></div>
-      <div class="stat"><div class="stat-label-row"><span class="stat-dot bat"></span><span class="stat-label">Batteri</span></div><div class="stat-value" id="now-soc">— <span class="stat-unit">%</span></div><div class="progress-bar"><div class="progress-fill" id="now-soc-bar" style="width: 0%"></div></div></div>
-      <div class="stat"><div class="stat-label-row"><span class="stat-dot nat"></span><span class="stat-label">Nät</span></div><div class="stat-value" id="now-grid">— <span class="stat-unit">kW</span></div></div>
-    </div>
-  </div>
-  <div class="card">
-    <div class="card-header">
-      <div class="card-title">Senaste 7 dagarna</div>
-      <div class="card-meta" id="week-total" style="color: var(--text-2); font-style: normal; font-weight: 500;">— kr</div>
-    </div>
-    <div class="bars" id="week-bars"></div>
-  </div>
-  <div class="quick-stats">
-    <div class="quick-stat">
-      <div class="quick-stat-label" id="month-label">DENNA MÅNAD</div>
-      <div class="quick-stat-value" id="month-value">— <span class="unit">kr</span></div>
-      <div class="quick-stat-sub" id="month-sub">—</div>
-    </div>
-    <div class="quick-stat">
-      <div class="quick-stat-label">SEDAN START</div>
-      <div class="quick-stat-value" id="grand-value">— <span class="unit">kr</span></div>
-      <div class="quick-stat-sub" id="grand-sub">—</div>
-    </div>
-  </div>
-  <div class="insight" id="insight">
-    <span class="insight-icon">💡</span>
-    <div class="insight-text">
-      <strong id="insight-title">Hämtar status…</strong>
-      <span id="insight-body">Appen läser data direkt från ditt GitHub-repo.</span>
-    </div>
-  </div>
+
+<div class="header">
+<div>
+<h1>SigenStor</h1>
+<div class="subtitle">Just nu</div>
 </div>
-<div class="nav">
-  <div class="nav-inner">
-    <div class="nav-item active"><div class="nav-label">Idag</div></div>
-    <div class="nav-item"><div class="nav-label">Historik</div></div>
-    <div class="nav-item"><div class="nav-label">Insikter</div></div>
-    <div class="nav-item" onclick="refresh()"><div class="nav-label">Uppdatera</div></div>
-  </div>
+<div style="display: flex; align-items: center; gap: 12px;">
+<div class="time" id="current-time">--:--</div>
+<button class="refresh-btn" onclick="refresh()">↻</button>
 </div>
+</div>
+
+<div class="hero">
+<div class="label">Batterinivå</div>
+<div class="value" id="soc">--.- %</div>
+<div class="bar"><div class="bar-fill" id="soc-bar" style="width:0%"></div></div>
+</div>
+
+<div class="grid">
+<div class="tile">
+<div class="label">☀️ Solel</div>
+<div class="value" id="sol">-- <span class="unit">kW</span></div>
+</div>
+<div class="tile">
+<div class="label">🏠 Hus</div>
+<div class="value" id="load">-- <span class="unit">kW</span></div>
+</div>
+<div class="tile" id="ev-tile">
+<div class="label">🚗 Bil (EVDC)</div>
+<div class="value" id="ev">-- <span class="unit">kW</span></div>
+</div>
+<div class="tile">
+<div class="label">⚡ Elnät</div>
+<div class="value" id="grid">-- <span class="unit">kW</span></div>
+</div>
+</div>
+
+<div class="mode-card">
+<div class="label">Läge</div>
+<div class="value" id="mode">--</div>
+</div>
+
+<!-- Day navigator -->
+<div class="section-title">
+<div class="title" id="day-title">Idag - effektflöde</div>
+<div class="sub" id="flow-sub">kW per 5 min</div>
+</div>
+
+<div class="day-nav">
+<button class="day-nav-btn" id="prev-day" onclick="navigateDay(-1)">‹</button>
+<label class="day-nav-date" id="day-date-label">
+<span id="day-date-text">fredag 27 maj 2026</span>
+<input type="date" id="day-picker" onchange="setDayFromPicker(this.value)">
+</label>
+<button class="day-nav-btn" id="next-day" onclick="navigateDay(1)">›</button>
+<button class="day-nav-today-btn" id="today-btn" onclick="goToToday()">Idag</button>
+</div>
+
+<div class="card flow-card">
+<svg class="flow-chart" id="flow-chart" viewBox="0 0 480 200" preserveAspectRatio="none"></svg>
+<div class="flow-legend">
+<div class="legend-item"><span class="legend-swatch" style="background:#E8B91A"></span>Sol</div>
+<div class="legend-item"><span class="legend-swatch" style="background:#3D7BD9"></span>Last</div>
+<div class="legend-item"><span class="legend-swatch" style="background:#8E5BBC"></span>Batteri</div>
+<div class="legend-item"><span class="legend-swatch" style="background:#6e6e73"></span>Nät</div>
+</div>
+<div class="day-savings">
+<div class="item">
+<div class="label">☀️ Sol</div>
+<div class="value sol" id="day-sol-kr">-- kr</div>
+</div>
+<div class="item">
+<div class="label">🔋 Batteri</div>
+<div class="value bat" id="day-bat-kr">-- kr</div>
+</div>
+<div class="item">
+<div class="label">Totalt</div>
+<div class="value total" id="day-total-kr">-- kr</div>
+</div>
+</div>
+<div class="day-kwh">
+<div class="item">
+<div class="label">SOL kWh</div>
+<div class="value" id="day-sol-kwh">--</div>
+</div>
+<div class="item">
+<div class="label">LAST kWh</div>
+<div class="value" id="day-last-kwh">--</div>
+</div>
+<div class="item">
+<div class="label">KÖP kWh</div>
+<div class="value" id="day-import-kwh">--</div>
+</div>
+<div class="item">
+<div class="label">SÄLJ kWh</div>
+<div class="value" id="day-export-kwh">--</div>
+</div>
+</div>
+</div>
+
+<div class="section-title">
+<div class="title">Senaste 7 dagarna</div>
+<div class="sub">kr besparing</div>
+</div>
+<div class="card" style="padding: 16px;">
+<div class="chart" id="chart">
+<div class="loading">Hämtar data...</div>
+</div>
+</div>
+
+<div class="card" style="padding: 16px;">
+<div class="stats">
+<div class="stat">
+<div class="label">Denna månad</div>
+<div class="value" id="month-total">-- kr</div>
+</div>
+<div class="stat">
+<div class="label">Totalt</div>
+<div class="value" id="grand-total">-- kr</div>
+</div>
+<div class="stat">
+<div class="label">Per år (est.)</div>
+<div class="value" id="year-est">-- kr</div>
+</div>
+</div>
+</div>
+
+<div class="footer">
+SigenStor • <a href="https://github.com/marcus671203/SigenStor" style="color: #185FA5; text-decoration: none;">GitHub</a>
+<div class="updated" id="updated">Uppdaterad: --</div>
+</div>
+
+</div>
+
 <script>
-const CONFIG = { basePath: '..', refreshSeconds: 60 };
-const DAYS = ['sön','mån','tis','ons','tor','fre','lör'];
-const MONTHS_LONG = ['januari','februari','mars','april','maj','juni','juli','augusti','september','oktober','november','december'];
+const API = "https://marcus-sigen.duckdns.org/api";
+const dayNames = ["sön","mån","tis","ons","tor","fre","lör"];
+const dayNamesLong = ["söndag","måndag","tisdag","onsdag","torsdag","fredag","lördag"];
+const monthNamesLong = ["januari","februari","mars","april","maj","juni","juli","augusti","september","oktober","november","december"];
 
-function fmt(v, d=2) { return (v==null||isNaN(v)) ? '—' : v.toFixed(d).replace('.', ','); }
-function fmtInt(v) { return (v==null||isNaN(v)) ? '—' : Math.round(v).toLocaleString('sv-SE'); }
+let selectedDate = null;
+let earliestDate = null;
+let todayDate = null;
 
-function setStatus(state, text) {
-  document.getElementById('live-dot').className = 'live-dot' + (state==='ok' ? '' : ' '+state);
-  document.getElementById('live-text').textContent = text;
+function formatKr(num) {
+  if (num === null || num === undefined) return "-- kr";
+  return new Intl.NumberFormat("sv-SE", { maximumFractionDigits: 0 }).format(num) + " kr";
 }
-function showError(msg) { const el=document.getElementById('error-banner'); el.textContent=msg; el.style.display='block'; }
-function hideError() { document.getElementById('error-banner').style.display='none'; }
 
-async function fetchJSON(path) {
-  const r = await fetch(`${CONFIG.basePath}/${path}?t=${Date.now()}`, { cache:'no-store' });
-  if (!r.ok) throw new Error(`${r.status} ${path}`);
+function formatDateLong(dateStr) {
+  const dt = new Date(dateStr + "T12:00:00");
+  return dayNamesLong[dt.getDay()] + " " + dt.getDate() + " " + monthNamesLong[dt.getMonth()] + " " + dt.getFullYear();
+}
+
+function setClock() {
+  const now = new Date();
+  document.getElementById("current-time").textContent =
+    now.getHours().toString().padStart(2,"0") + ":" + now.getMinutes().toString().padStart(2,"0");
+}
+
+function todayLocalISO() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  return yyyy + "-" + mm + "-" + dd;
+}
+
+function addDays(dateStr, n) {
+  const dt = new Date(dateStr + "T12:00:00");
+  dt.setDate(dt.getDate() + n);
+  const yyyy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return yyyy + "-" + mm + "-" + dd;
+}
+
+async function fetchLatest() {
+  const r = await fetch(API + "/latest");
+  if (!r.ok) throw new Error("Latest fetch failed");
   return r.json();
 }
-async function fetchText(path) {
-  const r = await fetch(`${CONFIG.basePath}/${path}?t=${Date.now()}`, { cache:'no-store' });
-  if (!r.ok) throw new Error(`${r.status} ${path}`);
-  return r.text();
+
+async function fetchSummary() {
+  const r = await fetch(API + "/summary");
+  if (!r.ok) throw new Error("Summary fetch failed");
+  return r.json();
 }
 
-function updateHeader() {
-  const n = new Date();
-  document.getElementById('date-label').textContent = DAYS[n.getDay()]+'dag';
-  document.getElementById('date-main').textContent = `${n.getDate()} ${MONTHS_LONG[n.getMonth()]}`;
+async function fetchDay5min(dateStr) {
+  const r = await fetch(API + "/day/" + dateStr + "/5min");
+  if (!r.ok) throw new Error("Day 5min fetch failed");
+  return r.json();
 }
 
-async function loadLatest() {
-  const ymd = new Date().toISOString().slice(0,10);
-  const text = await fetchText(`data/raw/${ymd}.jsonl`);
-  const lines = text.trim().split('\n').filter(Boolean);
-  if (!lines.length) throw new Error('Tom fil');
-  return JSON.parse(lines[lines.length-1]);
+async function fetchAvailableDates() {
+  const r = await fetch(API + "/days5min?limit=400");
+  if (!r.ok) throw new Error("days5min fetch failed");
+  const data = await r.json();
+  return (data.days || []).map(d => d.date_local).sort();
 }
 
-async function loadSummary() {
-  try { return await fetchJSON('data/summary.json'); } catch { return null; }
+function updateLive(d) {
+  const soc = d.battery_soc || 0;
+  document.getElementById("soc").textContent = soc.toFixed(1) + " %";
+  document.getElementById("soc-bar").style.width = soc + "%";
+
+  const sol = (d.pv_power || 0) + (d.third_pv_power || 0);
+  document.getElementById("sol").innerHTML = sol.toFixed(1) + ' <span class="unit">kW</span>';
+  document.getElementById("load").innerHTML = (d.load_power || 0).toFixed(1) + ' <span class="unit">kW</span>';
+  document.getElementById("ev").innerHTML = (d.ev_power || 0).toFixed(1) + ' <span class="unit">kW</span>';
+  document.getElementById("grid").innerHTML = (d.buy_sell_power || 0).toFixed(1) + ' <span class="unit">kW</span>';
+
+  const evTile = document.getElementById("ev-tile");
+  if (d.ev_power && d.ev_power > 0.1) evTile.classList.add("active");
+  else evTile.classList.remove("active");
+
+  document.getElementById("mode").textContent = d.mode || "—";
+
+  if (d.ts_local) {
+    const t = new Date(d.ts_local);
+    document.getElementById("updated").textContent =
+      "Uppdaterad: " + t.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
+  }
 }
 
-function renderNow(latest) {
-  const f = latest.flow;
-  const ts = new Date(latest.ts_local);
-  const hh = String(ts.getHours()).padStart(2,'0');
-  const mm = String(ts.getMinutes()).padStart(2,'0');
-  document.getElementById('now-title').textContent = `Just nu — ${hh}:${mm}`;
-  document.getElementById('now-mode').textContent = latest.mode || '—';
-  const sol = (f.pvPower||0) + (f.thirdPvPower||0);
-  document.getElementById('now-sol').innerHTML = `${fmt(sol)} <span class="stat-unit">kW</span>`;
-  document.getElementById('now-last').innerHTML = `${fmt(f.loadPower)} <span class="stat-unit">kW</span>`;
-  const soc = f.batterySoc||0;
-  document.getElementById('now-soc').innerHTML = `${fmt(soc,0)} <span class="stat-unit">%</span>`;
-  document.getElementById('now-soc-bar').style.width = `${soc}%`;
-  document.getElementById('now-grid').innerHTML = `${fmt(f.buySellPower||0)} <span class="stat-unit">kW</span>`;
-  const ageMin = (Date.now()-ts.getTime())/60000;
-  if (ageMin<8) setStatus('ok','Live');
-  else if (ageMin<30) setStatus('stale', `${Math.round(ageMin)} min`);
-  else setStatus('error', `${Math.round(ageMin)} min`);
+function updateSummary(s) {
+  const last7 = (s.last_30_days || []).slice(-7);
+  const chartEl = document.getElementById("chart");
+
+  if (last7.length === 0) {
+    chartEl.innerHTML = '<div class="loading">Ingen historik än</div>';
+  } else {
+    const maxVal = Math.max(...last7.map(d => d.total_kr || 0), 1);
+    chartEl.innerHTML = last7.map(d => {
+      const val = d.total_kr || 0;
+      const pct = (val / maxVal) * 100;
+      const isHigh = val > maxVal * 0.7;
+      const dt = new Date(d.date);
+      const dayLbl = dayNames[dt.getDay()];
+      return '<div class="bar-col">' +
+        '<div class="amt">' + Math.round(val) + '</div>' +
+        '<div class="bar ' + (isHigh ? "high" : "") + '" style="height:' + pct + '%"></div>' +
+        '<div class="lbl">' + dayLbl + '</div>' +
+        '</div>';
+    }).join("");
+  }
+
+  const now = new Date();
+  const monthKey = now.toISOString().slice(0,7);
+  const monthData = (s.monthly || []).find(m => m.month === monthKey);
+  document.getElementById("month-total").textContent = formatKr(monthData ? monthData.total_kr : 0);
+  document.getElementById("grand-total").textContent = formatKr(s.grand_total_kr || 0);
+
+  const totalDays = s.total_days || 0;
+  const yearEst = totalDays > 0 ? (s.grand_total_kr / totalDays) * 365 : 0;
+  document.getElementById("year-est").textContent = formatKr(yearEst);
 }
 
-function renderSummary(s) {
-  if (!s) {
-    document.getElementById('insight-title').textContent = 'Ingen aggregering ännu';
-    document.getElementById('insight-body').textContent = 'Daglig sammanfattning skapas kl 03 imorgon.';
+function renderFlowChart(payload) {
+  const svg = document.getElementById("flow-chart");
+  const data = payload.data || [];
+
+  // Reset display
+  const dayElements = ["day-sol-kr", "day-bat-kr", "day-total-kr"];
+  const kwhElements = ["day-sol-kwh", "day-last-kwh", "day-import-kwh", "day-export-kwh"];
+
+  if (data.length === 0) {
+    svg.innerHTML = '<text x="240" y="100" text-anchor="middle" fill="#86868b" font-size="13">Ingen data för denna dag</text>';
+    dayElements.forEach(id => document.getElementById(id).textContent = "-- kr");
+    kwhElements.forEach(id => document.getElementById(id).textContent = "--");
+    document.getElementById("flow-sub").textContent = "0 mätpunkter";
     return;
   }
-  document.getElementById('grand-value').innerHTML = `${fmtInt(s.grand_total_kr)} <span class="unit">kr</span>`;
-  document.getElementById('grand-sub').textContent = `${s.total_days} dagar`;
-  const now = new Date();
-  const tm = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  const mr = (s.monthly||[]).find(m=>m.month===tm);
-  document.getElementById('month-label').textContent = MONTHS_LONG[now.getMonth()].toUpperCase()+' '+now.getFullYear();
-  if (mr) {
-    document.getElementById('month-value').innerHTML = `${fmtInt(mr.total_kr)} <span class="unit">kr</span>`;
-    const days = (s.last_30_days||[]).filter(d=>d.date.startsWith(tm)).length;
-    document.getElementById('month-sub').textContent = `▲ ${fmt(days>0?mr.total_kr/days:0,0)} kr/dag`;
+
+  const W = 480, H = 200;
+  const padLeft = 30, padRight = 8, padTop = 12, padBottom = 22;
+  const innerW = W - padLeft - padRight;
+  const innerH = H - padTop - padBottom;
+
+  let minVal = 0, maxVal = 0;
+  for (const r of data) {
+    const all = [r.pv3_kw || 0, r.last_kw || 0, r.bat_kw || 0, r.grid_kw || 0, r.evdc_kw || 0];
+    for (const v of all) {
+      if (v < minVal) minVal = v;
+      if (v > maxVal) maxVal = v;
+    }
   }
-  const ts = now.toISOString().slice(0,10);
-  const tr = (s.last_30_days||[]).find(d=>d.date===ts);
-  if (tr) {
-    document.getElementById('savings-total').innerHTML = `${fmt(tr.total_kr)}<span class="unit"> kr</span>`;
-    document.getElementById('savings-sol').textContent = fmt(tr.sol_kr);
-    document.getElementById('savings-bat').textContent = fmt(tr.bat_kr);
+  const range = Math.max(maxVal - minVal, 1);
+  const yMin = minVal - range * 0.05;
+  const yMax = maxVal + range * 0.05;
+
+  const xScale = (ts_local) => {
+    const t = new Date(ts_local);
+    const hourOfDay = t.getHours() + t.getMinutes() / 60 + t.getSeconds() / 3600;
+    return padLeft + (hourOfDay / 24) * innerW;
+  };
+  const yScale = (v) => padTop + (1 - (v - yMin) / (yMax - yMin)) * innerH;
+
+  function indexForHour(h) {
+    for (let i = 0; i < data.length; i++) {
+      const t = new Date(data[i].ts_local);
+      if (t.getHours() >= h) return i;
+    }
+    return data.length - 1;
   }
-  const l7 = (s.last_30_days||[]).slice(-7);
-  if (l7.length) {
-    const max = Math.max(...l7.map(d=>d.total_kr),1);
-    let t7 = 0;
-    document.getElementById('week-bars').innerHTML = l7.map(d=>{
-      t7 += d.total_kr;
-      const dt = new Date(d.date);
-      const it = d.date===ts;
-      const h = Math.max(4, (d.total_kr/max)*70);
-      return `<div class="bar-col"><div class="bar${it?' today':''}" style="height:${h}px"></div><div class="bar-label${it?' today':''}">${it?'idag':DAYS[dt.getDay()]+' '+dt.getDate()}</div></div>`;
-    }).join('');
-    document.getElementById('week-total').textContent = `${fmtInt(t7)} kr`;
+
+  function pathFor(key) {
+    const points = data.map((r) => {
+      return xScale(r.ts_local) + "," + yScale(r[key] || 0);
+    });
+    return "M " + points.join(" L ");
   }
-  if (tr) {
-    document.getElementById('insight-title').textContent = 'Beräkning klar!';
-    document.getElementById('insight-body').textContent = `Idag har du sparat ${fmt(tr.total_kr)} kr.`;
+
+  let svgContent = "";
+  const y0 = yScale(0);
+  svgContent += '<line x1="' + padLeft + '" y1="' + y0 + '" x2="' + (W - padRight) + '" y2="' + y0 + '" stroke="#d1d1d6" stroke-width="0.5" stroke-dasharray="2,2"/>';
+  svgContent += '<text x="4" y="' + (yScale(yMax) + 4) + '" font-size="9" fill="#86868b">' + yMax.toFixed(1) + '</text>';
+  svgContent += '<text x="4" y="' + (yScale(yMin) + 4) + '" font-size="9" fill="#86868b">' + yMin.toFixed(1) + '</text>';
+  svgContent += '<text x="4" y="' + (y0 + 4) + '" font-size="9" fill="#86868b">0</text>';
+
+  const hours = [0, 6, 12, 18, 24];
+  for (const h of hours) {
+    // xScale tar en ts_local-sträng; bygg en syntetisk för timmen h
+    const dateStr = data[0].ts_local.substring(0, 10);
+    const syntheticTs = h === 24 
+      ? dateStr + "T23:59:59"
+      : dateStr + "T" + String(h).padStart(2, "0") + ":00:00";
+    const xi = xScale(syntheticTs);
+    svgContent += '<line x1="' + xi + '" y1="' + (padTop + innerH) + '" x2="' + xi + '" y2="' + (padTop + innerH + 3) + '" stroke="#86868b" stroke-width="0.5"/>';
+    svgContent += '<text x="' + xi + '" y="' + (H - 6) + '" font-size="9" fill="#86868b" text-anchor="middle">' + h + '</text>';
+  }
+
+  svgContent += '<path d="' + pathFor("pv3_kw") + '" stroke="#E8B91A" stroke-width="1.5" fill="none"/>';
+  svgContent += '<path d="' + pathFor("last_kw") + '" stroke="#3D7BD9" stroke-width="1.5" fill="none"/>';
+  svgContent += '<path d="' + pathFor("bat_kw") + '" stroke="#8E5BBC" stroke-width="1.5" fill="none"/>';
+  svgContent += '<path d="' + pathFor("grid_kw") + '" stroke="#6e6e73" stroke-width="1" fill="none" opacity="0.7"/>';
+
+  svg.innerHTML = svgContent;
+
+  const summary = payload.summary;
+  if (summary) {
+    document.getElementById("day-sol-kr").textContent = formatKr(summary.sol_kr);
+    document.getElementById("day-bat-kr").textContent = formatKr(summary.bat_kr);
+    document.getElementById("day-total-kr").textContent = formatKr(summary.total_kr);
+    document.getElementById("day-sol-kwh").textContent = (summary.sol_kwh || 0).toFixed(1);
+    document.getElementById("day-last-kwh").textContent = (summary.last_kwh || 0).toFixed(1);
+    document.getElementById("day-import-kwh").textContent = (summary.import_kwh || 0).toFixed(1);
+    document.getElementById("day-export-kwh").textContent = (summary.export_kwh || 0).toFixed(1);
+  } else {
+    dayElements.forEach(id => document.getElementById(id).textContent = "-- kr");
+    kwhElements.forEach(id => document.getElementById(id).textContent = "--");
+  }
+  document.getElementById("flow-sub").textContent = data.length + " mätpunkter";
+}
+
+function updateDayNav() {
+  document.getElementById("day-date-text").textContent = formatDateLong(selectedDate);
+  document.getElementById("day-picker").value = selectedDate;
+
+  if (selectedDate === todayDate) {
+    document.getElementById("day-title").textContent = "Idag - effektflöde";
+  } else {
+    document.getElementById("day-title").textContent = "Effektflöde";
+  }
+
+  document.getElementById("prev-day").disabled = earliestDate && selectedDate <= earliestDate;
+  document.getElementById("next-day").disabled = selectedDate >= todayDate;
+  document.getElementById("today-btn").disabled = selectedDate === todayDate;
+}
+
+async function navigateDay(delta) {
+  const target = addDays(selectedDate, delta);
+  if (delta < 0 && earliestDate && target < earliestDate) return;
+  if (delta > 0 && target > todayDate) return;
+  selectedDate = target;
+  updateDayNav();
+  await loadDayData();
+}
+
+async function setDayFromPicker(value) {
+  if (!value) return;
+  if (earliestDate && value < earliestDate) value = earliestDate;
+  if (value > todayDate) value = todayDate;
+  selectedDate = value;
+  updateDayNav();
+  await loadDayData();
+}
+
+async function goToToday() {
+  selectedDate = todayDate;
+  updateDayNav();
+  await loadDayData();
+}
+
+async function loadDayData() {
+  try {
+    const data = await fetchDay5min(selectedDate);
+    renderFlowChart(data);
+  } catch (e) {
+    console.error("Failed to load day data:", e);
+    renderFlowChart({ data: [], summary: null });
   }
 }
 
 async function refresh() {
-  setStatus('stale','Hämtar…');
-  hideError();
-  updateHeader();
   try {
-    const [l,s] = await Promise.allSettled([loadLatest(), loadSummary()]);
-    if (l.status==='fulfilled') renderNow(l.value);
-    else { setStatus('error','Fel'); showError('Kunde inte hämta senaste pollning.'); }
-    if (s.status==='fulfilled') renderSummary(s.value);
-  } catch(e) { setStatus('error','Fel'); showError('Fel: '+e.message); }
+    todayDate = todayLocalISO();
+    if (!selectedDate) selectedDate = todayDate;
+
+    if (earliestDate === null) {
+      const dates = await fetchAvailableDates();
+      if (dates.length > 0) earliestDate = dates[0];
+      const picker = document.getElementById("day-picker");
+      if (earliestDate) picker.min = earliestDate;
+      picker.max = todayDate;
+    }
+
+    const [latest, summary, day5min] = await Promise.all([
+      fetchLatest(),
+      fetchSummary(),
+      fetchDay5min(selectedDate),
+    ]);
+    updateLive(latest);
+    updateSummary(summary);
+    renderFlowChart(day5min);
+    updateDayNav();
+  } catch (e) {
+    console.error(e);
+    document.getElementById("chart").innerHTML =
+      '<div class="error">Kunde inte ansluta till API:t</div>';
+  }
 }
 
+setClock();
+setInterval(setClock, 30000);
 refresh();
-setInterval(refresh, CONFIG.refreshSeconds*1000);
-document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) refresh(); });
+setInterval(refresh, 60000);
 </script>
 </body>
 </html>

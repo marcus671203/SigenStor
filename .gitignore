@@ -1,0 +1,28 @@
+# Existing
+.env
+venv/
+__pycache__/
+
+# Virtual environments
+venv-*/
+
+# Backup files
+*.bak-*
+*.backup
+*.backup2
+
+# Generated files
+*.xlsx
+data/sigen.db
+data/sigen.db.backup-*
+data/spot_cache/
+data/sigen_api_explore/
+data/sigen_downloads/
+logs/
+
+# Old temp files
+cd
+
+# Python
+*.pyc
+*.pyo
