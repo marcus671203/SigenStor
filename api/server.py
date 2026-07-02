@@ -7,11 +7,24 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, EmailStr
+import uuid
+import subprocess
+import smtplib
+import ssl
+from email.message import EmailMessage
+from dotenv import load_dotenv
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 from db import connect
+
+# Ladda .env för mail-credentials
+load_dotenv(Path(__file__).parent.parent / ".env")
+
+# Jobb-lagring för async email tasks
+EMAIL_JOBS = {}
 
 TZ = ZoneInfo("Europe/Stockholm")
 
@@ -25,7 +38,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -210,3 +223,98 @@ def summary():
         "monthly": [dict(r) for r in monthly],
         "last_30_days": [dict(r) for r in reversed(last_30)],
     }
+
+
+class SendExcelRequest(BaseModel):
+    email: str
+
+
+def run_excel_job(job_id: str, email: str):
+    """Bygg Excel och skicka via mail. Uppdatera EMAIL_JOBS med status."""
+    root = Path(__file__).parent.parent
+    xlsx = root / "energibesparing.xlsx"
+    
+    try:
+        EMAIL_JOBS[job_id] = {"status": "running", "message": "Bygger Excel..."}
+        
+        # 1) Bygg Excel-filen via build_v60.py, men rename output
+        # Vi kör en Python inline så vi kan sätta EXCEL_OUTPUT_PATH
+        build_script = root / "scripts" / "excel" / "build_v60.py"
+        result = subprocess.run(
+            [str(root / "venv-sigen-api" / "bin" / "python"), str(build_script)],
+            cwd=str(root),
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
+        if result.returncode != 0:
+            EMAIL_JOBS[job_id] = {
+                "status": "error",
+                "message": f"Excel-generering misslyckades: {result.stderr[:300]}"
+            }
+            return
+        
+        # 2) Hitta senaste v-filen (v61.xlsx etc) och kopiera till energibesparing.xlsx
+        v_files = sorted(root.glob("energibesparing_v*.xlsx"))
+        if not v_files:
+            EMAIL_JOBS[job_id] = {"status": "error", "message": "Ingen Excel-fil genererad"}
+            return
+        latest = v_files[-1]
+        import shutil
+        shutil.copy(latest, xlsx)
+        
+        EMAIL_JOBS[job_id] = {"status": "running", "message": f"Skickar mail till {email}..."}
+        
+        # 3) Skicka mail
+        msg = EmailMessage()
+        msg["From"] = os.environ["GMAIL_USER"]
+        msg["To"] = email
+        msg["Subject"] = "Sigen energibesparing (senaste)"
+        msg.set_content(
+            f"Hej!\n\n"
+            f"Senaste Sigen energibesparing bifogas.\n\n"
+            f"Genererad: {datetime.now(TZ).strftime('%Y-%m-%d %H:%M')}\n\n"
+            f"MVH,\nSigen VPS\n"
+        )
+        with open(xlsx, "rb") as f:
+            msg.add_attachment(
+                f.read(),
+                maintype="application",
+                subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                filename="energibesparing.xlsx"
+            )
+        
+        ctx = ssl.create_default_context()
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=ctx) as s:
+            s.login(os.environ["GMAIL_USER"], os.environ["GMAIL_APP_PASSWORD"])
+            s.send_message(msg)
+        
+        EMAIL_JOBS[job_id] = {
+            "status": "done",
+            "message": f"✅ Skickat till {email}!"
+        }
+    except Exception as e:
+        EMAIL_JOBS[job_id] = {
+            "status": "error",
+            "message": f"Fel: {str(e)[:300]}"
+        }
+
+
+@app.post("/api/send-excel")
+def send_excel(req: SendExcelRequest, background: BackgroundTasks):
+    """Bygg Excel och skicka via mail. Async - returnera job_id direkt."""
+    if not req.email or "@" not in req.email:
+        raise HTTPException(400, "Ogiltig mailadress")
+    
+    job_id = str(uuid.uuid4())
+    EMAIL_JOBS[job_id] = {"status": "pending", "message": "Väntar på start..."}
+    background.add_task(run_excel_job, job_id, req.email)
+    return {"job_id": job_id, "status": "pending"}
+
+
+@app.get("/api/send-excel/status/{job_id}")
+def send_excel_status(job_id: str):
+    """Hämta status för Excel-mail-jobb."""
+    if job_id not in EMAIL_JOBS:
+        raise HTTPException(404, "Job not found")
+    return EMAIL_JOBS[job_id]

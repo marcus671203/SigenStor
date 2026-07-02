@@ -115,6 +115,18 @@ html, body {
 .stats .stat .value { font-size: 15px; font-weight: 600; color: #185FA5; margin-top: 2px; }
 
 .footer { text-align: center; padding: 24px 0 16px; font-size: 11px; color: #86868b; }
+.email-section { background: #fff; border-radius: 14px; padding: 16px; margin: 20px 0; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+.email-section h3 { margin: 0 0 12px; font-size: 15px; font-weight: 600; color: #1d1d1f; }
+.email-input-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.email-input { flex: 1; padding: 10px 12px; border: 1px solid #d2d2d7; border-radius: 8px; font-size: 15px; font-family: inherit; background: #f5f5f7; }
+.email-input:focus { outline: none; border-color: #0071e3; background: #fff; }
+.send-excel-btn { padding: 10px 18px; background: #0071e3; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.send-excel-btn:hover:not(:disabled) { background: #0077ed; }
+.send-excel-btn:disabled { background: #86868b; cursor: not-allowed; opacity: 0.6; }
+.excel-status { font-size: 13px; padding: 8px 0; min-height: 20px; color: #515154; }
+.excel-status.success { color: #34c759; font-weight: 500; }
+.excel-status.error { color: #ff3b30; }
+.excel-status.running { color: #0071e3; }
 .footer .updated { margin-top: 4px; }
 
 .loading { color: #86868b; font-size: 14px; }
@@ -279,6 +291,15 @@ html, body {
 <div class="value" id="year-est">-- kr</div>
 </div>
 </div>
+</div>
+
+<div class="email-section">
+  <h3>📧 Skicka Excel-rapport</h3>
+  <div class="email-input-row">
+    <input type="email" class="email-input" id="email-input" placeholder="din@epost.se" autocomplete="email">
+    <button class="send-excel-btn" id="send-excel-btn" onclick="sendExcelReport()">Skicka</button>
+  </div>
+  <div class="excel-status" id="excel-status"></div>
 </div>
 
 <div class="footer">
@@ -585,6 +606,78 @@ async function refresh() {
     console.error(e);
     document.getElementById("chart").innerHTML =
       '<div class="error">Kunde inte ansluta till API:t</div>';
+  }
+}
+
+// Excel-mail knapp
+const emailInput = document.getElementById("email-input");
+const sendBtn = document.getElementById("send-excel-btn");
+const excelStatus = document.getElementById("excel-status");
+
+// Ladda senast använd email
+const savedEmail = localStorage.getItem("sigen_email");
+if (savedEmail) emailInput.value = savedEmail;
+
+async function sendExcelReport() {
+  const email = emailInput.value.trim();
+  if (!email || !email.includes("@")) {
+    excelStatus.textContent = "Ange en giltig mailadress";
+    excelStatus.className = "excel-status error";
+    return;
+  }
+  
+  // Spara för nästa gång
+  localStorage.setItem("sigen_email", email);
+  
+  sendBtn.disabled = true;
+  sendBtn.textContent = "...";
+  excelStatus.textContent = "Startar...";
+  excelStatus.className = "excel-status running";
+  
+  try {
+    const resp = await fetch("/api/send-excel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email })
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const { job_id } = await resp.json();
+    
+    // Polla status varje 2:a sekund, max 60 sek
+    let attempts = 0;
+    const maxAttempts = 30;
+    
+    while (attempts < maxAttempts) {
+      await new Promise(r => setTimeout(r, 2000));
+      attempts++;
+      
+      const statusResp = await fetch(`/api/send-excel/status/${job_id}`);
+      if (!statusResp.ok) throw new Error(`Status HTTP ${statusResp.status}`);
+      const s = await statusResp.json();
+      
+      excelStatus.textContent = s.message;
+      
+      if (s.status === "done") {
+        excelStatus.className = "excel-status success";
+        break;
+      } else if (s.status === "error") {
+        excelStatus.className = "excel-status error";
+        break;
+      } else {
+        excelStatus.className = "excel-status running";
+      }
+    }
+    
+    if (attempts >= maxAttempts) {
+      excelStatus.textContent = "Timeout - kolla din inbox manuellt";
+      excelStatus.className = "excel-status error";
+    }
+  } catch (e) {
+    excelStatus.textContent = `Fel: ${e.message}`;
+    excelStatus.className = "excel-status error";
+  } finally {
+    sendBtn.disabled = false;
+    sendBtn.textContent = "Skicka";
   }
 }
 
