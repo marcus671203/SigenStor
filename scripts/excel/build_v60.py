@@ -174,7 +174,7 @@ def build_summary(wb, all_days):
         ws.cell(row=row, column=2).number_format = NUM_KR
         ws.cell(row=row, column=2).alignment = Alignment(horizontal="right", vertical="center")
         
-        ws.cell(row=row, column=3, value=f"=IF(K{row}<>0,B{row}/K{row},0)").font = make_font(size=10)
+        ws.cell(row=row, column=3, value=(sol_kr/total_kr if total_kr else 0)).font = make_font(size=10)
         ws.cell(row=row, column=3).fill = PatternFill("solid", start_color=GREEN_FILL)
         ws.cell(row=row, column=3).number_format = NUM_PCT
         ws.cell(row=row, column=3).alignment = Alignment(horizontal="right", vertical="center")
@@ -184,7 +184,7 @@ def build_summary(wb, all_days):
         ws.cell(row=row, column=4).number_format = NUM_KR
         ws.cell(row=row, column=4).alignment = Alignment(horizontal="right", vertical="center")
         
-        ws.cell(row=row, column=5, value=f"=IF(K{row}<>0,D{row}/K{row},0)").font = make_font(size=10)
+        ws.cell(row=row, column=5, value=(bat_kr/total_kr if total_kr else 0)).font = make_font(size=10)
         ws.cell(row=row, column=5).fill = PatternFill("solid", start_color=BAT_FILL)
         ws.cell(row=row, column=5).number_format = NUM_PCT
         ws.cell(row=row, column=5).alignment = Alignment(horizontal="right", vertical="center")
@@ -201,7 +201,7 @@ def build_summary(wb, all_days):
         c.number_format = NUM_KR
         c.alignment = Alignment(horizontal="right", vertical="center")
         
-        c = ws.cell(row=row, column=8, value=f"=IF(K{row}<>0,G{row}/K{row},0)")
+        c = ws.cell(row=row, column=8, value=(evdc_kr_month/total_kr if total_kr else 0))
         c.font = make_font(size=10)
         c.fill = PatternFill("solid", start_color=EVDC_FILL)
         c.number_format = NUM_PCT
