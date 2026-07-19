@@ -716,7 +716,7 @@ async function loadBill(period) {
       
       <div class="bill-section">
         <div class="bill-section-title">Vattenfall (nät + skatt)</div>
-        <div class="bill-row"><span>Nätöverföring 44,5 öre</span><span>${fmt(vf.nat_overforing)}</span></div>
+        <div class="bill-row"><span>Nätöverföring ${vf.nat_overforing_rate_ore.toString().replace(".",",")} öre</span><span>${fmt(vf.nat_overforing)}</span></div>
         <div class="bill-row"><span>Energiskatt 45,0 öre</span><span>${fmt(vf.energiskatt)}</span></div>
         <div class="bill-row"><span>Fast abonnemang</span><span>${fmt(vf.fast)}</span></div>
         <div class="bill-row total"><span>Summa Vattenfall</span><span>${fmt(vf.summa)}</span></div>

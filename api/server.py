@@ -400,7 +400,18 @@ def get_bill(period: str):
     elhandel_kop = (kop_kwh_vikt + kop_kwh * 0.04) * 1.25
     elhandel_fast = 39.0
     elhandel_sal = sal_kwh_vikt + sal_kwh * 0.104
-    nat_over = kop_kwh * 0.445
+    
+    # Nätöverföring: bytte 2026-04-02
+    #   Före:  44.5 öre/kWh inkl moms
+    #   Efter: 24.4 öre/kWh exkl moms = 30.5 öre/kWh inkl moms
+    CONTRACT_CHANGE = ddate(2026, 4, 2)
+    period_date = ddate(year, month, 15)  # mitten av månaden avgör
+    if period_date >= CONTRACT_CHANGE:
+        nat_over_rate = 0.244 * 1.25  # 30.5 öre inkl moms
+    else:
+        nat_over_rate = 0.445
+    nat_over = kop_kwh * nat_over_rate
+    
     energiskatt = kop_kwh * 0.45
     nat_fast = 6468 * 1.25 / 12
     
@@ -424,6 +435,7 @@ def get_bill(period: str):
         },
         "vattenfall": {
             "nat_overforing": round(nat_over, 2),
+            "nat_overforing_rate_ore": round(nat_over_rate * 100, 1),
             "energiskatt": round(energiskatt, 2),
             "fast": round(nat_fast, 2),
             "summa": round(vattenfall_tot, 2)
