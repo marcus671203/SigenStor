@@ -60,7 +60,7 @@ def health():
     """Health check endpoint."""
     with connect() as conn:
         row = conn.execute(
-            "SELECT COUNT(*) as count, MAX(ts_utc) as latest FROM pollings"
+            "SELECT COUNT(*) as count, MAX(ts_utc) as latest FROM realtime"
         ).fetchone()
     return {
         "status": "ok",
@@ -72,13 +72,25 @@ def health():
 
 @app.get("/api/latest")
 def latest():
-    """Get the most recent polling."""
+    """Get the most recent realtime polling."""
     with connect() as conn:
-        row = conn.execute(
-            "SELECT * FROM pollings ORDER BY id DESC LIMIT 1"
-        ).fetchone()
+        row = conn.execute("""
+            SELECT ts_utc, ts_local,
+                   substr(ts_local, 1, 10) as date_local,
+                   pv_power_kw as pv_power,
+                   third_pv_kw as third_pv_power,
+                   load_kw as load_power,
+                   battery_kw as battery_power,
+                   battery_soc,
+                   buy_sell_kw as buy_sell_power,
+                   ev_power_kw as ev_power,
+                   pv_day_kwh as pv_day_nrg,
+                   op_mode as mode,
+                   raw_json
+            FROM realtime ORDER BY ts_utc DESC LIMIT 1
+        """).fetchone()
     if not row:
-        raise HTTPException(404, "No pollings found")
+        raise HTTPException(404, "No realtime data found")
     return row_to_dict(row)
 
 
@@ -99,10 +111,20 @@ def day(date: str):
 
     with connect() as conn:
         rows = conn.execute(
-            "SELECT ts_local, pv_power, third_pv_power, load_power, "
-            "battery_power, battery_soc, buy_sell_power, ev_power, "
-            "pv_day_nrg, mode FROM pollings WHERE date_local = ? "
-            "ORDER BY ts_local",
+            """
+            SELECT ts_local,
+                   pv_power_kw as pv_power,
+                   third_pv_kw as third_pv_power,
+                   load_kw as load_power,
+                   battery_kw as battery_power,
+                   battery_soc,
+                   buy_sell_kw as buy_sell_power,
+                   ev_power_kw as ev_power,
+                   pv_day_kwh as pv_day_nrg,
+                   op_mode as mode
+            FROM realtime WHERE substr(ts_local, 1, 10) = ?
+            ORDER BY ts_local
+            """,
             (date,),
         ).fetchall()
 
@@ -164,7 +186,7 @@ def days(limit: int = Query(60, ge=1, le=365)):
         rows = conn.execute(
             "SELECT date_local, COUNT(*) as count, "
             "MIN(ts_local) as first_ts, MAX(ts_local) as last_ts "
-            "FROM pollings GROUP BY date_local "
+            "FROM realtime GROUP BY substr(ts_local, 1, 10) "
             "ORDER BY date_local DESC LIMIT ?",
             (limit,),
         ).fetchall()
