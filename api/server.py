@@ -318,3 +318,115 @@ def send_excel_status(job_id: str):
     if job_id not in EMAIL_JOBS:
         raise HTTPException(404, "Job not found")
     return EMAIL_JOBS[job_id]
+
+
+@app.get("/api/bill/{period}")
+def get_bill(period: str):
+    """Beräkna elräkning för aktuell eller föregående månad.
+    
+    period: 'current' eller 'previous'
+    """
+    from datetime import date
+    import json
+    
+    today = datetime.now(TZ).date()
+    
+    if period == "current":
+        year, month = today.year, today.month
+        label = f"{month:02d}-{year} (pågående)"
+    elif period == "previous":
+        if today.month == 1:
+            year, month = today.year - 1, 12
+        else:
+            year, month = today.year, today.month - 1
+        label = f"{month:02d}-{year}"
+    else:
+        raise HTTPException(400, "period måste vara 'current' eller 'previous'")
+    
+    # Hämta alla 5-min-rader för månaden
+    month_pattern = f"{year:04d}-{month:02d}%"
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT ts_local, grid_kw FROM energy_5min_v2 WHERE date_local LIKE ? ORDER BY ts_local",
+            (month_pattern,)
+        ).fetchall()
+    
+    if not rows:
+        return {
+            "period": label,
+            "error": "Ingen data för denna period",
+            "kop_kwh": 0, "sal_kwh": 0, "totalt": 0
+        }
+    
+    # Ladda spot-priser
+    root = Path(__file__).parent.parent
+    spot_cache = root / "data" / "spot_cache"
+    spot_lookup = {}
+    from datetime import date as ddate, timedelta
+    d = ddate(year, month, 1)
+    while d.month == month:
+        f = spot_cache / f"{d.isoformat()}_SE3.json"
+        if f.exists():
+            data = json.loads(f.read_text())
+            for entry in data:
+                ts_start = entry["time_start"]
+                price = entry["SEK_per_kWh"]
+                dt = datetime.fromisoformat(ts_start.replace("Z", "+00:00"))
+                spot_lookup[(dt.date().isoformat(), dt.hour)] = price
+        d += timedelta(days=1)
+    
+    # Räkna
+    H = 5/60.0
+    kop_kwh_vikt = 0.0
+    kop_kwh = 0.0
+    sal_kwh_vikt = 0.0
+    sal_kwh = 0.0
+    
+    for r in rows:
+        ts = datetime.fromisoformat(r["ts_local"])
+        grid = r["grid_kw"] or 0
+        key = (ts.date().isoformat(), ts.hour)
+        spot = spot_lookup.get(key)
+        if spot is None:
+            continue
+        if grid > 0:
+            kop_kwh_vikt += grid * spot * H
+            kop_kwh += grid * H
+        else:
+            sal_kwh_vikt += (-grid) * spot * H
+            sal_kwh += (-grid) * H
+    
+    # Formler
+    elhandel_kop = (kop_kwh_vikt + kop_kwh * 0.04) * 1.25
+    elhandel_fast = 39.0
+    elhandel_sal = sal_kwh_vikt + sal_kwh * 0.104
+    nat_over = kop_kwh * 0.445
+    energiskatt = kop_kwh * 0.45
+    nat_fast = 6468 * 1.25 / 12
+    
+    elhandel_tot = elhandel_kop + elhandel_fast - elhandel_sal
+    vattenfall_tot = nat_over + energiskatt + nat_fast
+    totalt = elhandel_tot + vattenfall_tot
+    
+    return {
+        "period": label,
+        "year": year,
+        "month": month,
+        "kop_kwh": round(kop_kwh, 1),
+        "sal_kwh": round(sal_kwh, 1),
+        "snitt_spot_kop": round(kop_kwh_vikt / kop_kwh, 3) if kop_kwh else 0,
+        "snitt_spot_sal": round(sal_kwh_vikt / sal_kwh, 3) if sal_kwh else 0,
+        "elhandel": {
+            "kop": round(elhandel_kop, 2),
+            "fast": elhandel_fast,
+            "salj_intakt": round(elhandel_sal, 2),
+            "summa": round(elhandel_tot, 2)
+        },
+        "vattenfall": {
+            "nat_overforing": round(nat_over, 2),
+            "energiskatt": round(energiskatt, 2),
+            "fast": round(nat_fast, 2),
+            "summa": round(vattenfall_tot, 2)
+        },
+        "totalt": round(totalt, 2)
+    }
