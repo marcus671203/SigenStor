@@ -7,6 +7,20 @@ lagrar resultatet i `realtime`-tabellen.
 Designad för att köra som en långlivad systemd-service.
 """
 
+# User-Agent patch för att undvika CloudFront-blockering
+# Sigen-paketet skickar inga headers vilket CloudFront blockerar som bot
+import aiohttp as _aiohttp_ua_patch
+_orig_ua_init = _aiohttp_ua_patch.ClientSession.__init__
+def _patched_ua_init(self, *args, **kwargs):
+    headers = kwargs.get('headers') or {}
+    if isinstance(headers, dict):
+        headers.setdefault('User-Agent', 'okhttp/4.12.0')
+        headers.setdefault('Accept', 'application/json, */*')
+    kwargs['headers'] = headers
+    _orig_ua_init(self, *args, **kwargs)
+_aiohttp_ua_patch.ClientSession.__init__ = _patched_ua_init
+
+
 import asyncio
 import json
 import logging
