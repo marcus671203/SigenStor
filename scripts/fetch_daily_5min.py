@@ -62,8 +62,9 @@ SERIES_MAP = {
     "TO_LOAD":              ("last_kw",     -1),   # konsumtion
     "BATTERY":              ("bat_kw",      +1),   # invertera! api urladdning=+, mail=-
     "GRID":                 ("grid_kw",     +1),   # api köp=+, mail =? tills vidare speglar vi
-    "TO_EVDC":              ("evdc_in_kw",  +1),   # laddning EVDC
-    "FROM_EVDC":            ("evdc_ur_kw",  +1),   # V2H — EVDC ger effekt
+    "TO_EVDC":              ("evdc_in_kw",  +1),   # laddning EVDC (legacy före aug 2026)
+    "FROM_EVDC":            ("evdc_ur_kw",  +1),   # V2H (legacy före aug 2026)
+    "EVDC":                 ("evdc_direct_kw", +1), # NY: konsoliderad serie fr.o.m. juli 2026
 }
 
 
@@ -117,7 +118,14 @@ def upsert_rows(rows: dict[str, dict], target_date: date):
             bat_kw = vals.get("bat_kw", 0.0)
             grid_kw = vals.get("grid_kw", 0.0)
             pv3_kw = vals.get("pv3_kw", 0.0)
-            evdc_kw = vals.get("evdc_ur_kw", 0.0) + vals.get("evdc_in_kw", 0.0)
+            # Sigen bytte till konsoliderad EVDC-serie i juli 2026
+            # Legacy: TO_EVDC (neg=laddning) + FROM_EVDC (pos=urladdning) → summa
+            # Ny:     EVDC (neg=laddning, pos=urladdning) → direkt
+            evdc_direct = vals.get("evdc_direct_kw", None)
+            if evdc_direct is not None:
+                evdc_kw = evdc_direct  # Ny konsoliderad serie
+            else:
+                evdc_kw = vals.get("evdc_ur_kw", 0.0) + vals.get("evdc_in_kw", 0.0)
 
             if ts_local in existing:
                 conn.execute("""
