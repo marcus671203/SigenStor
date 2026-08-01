@@ -92,6 +92,30 @@ async def fetch_day(sigen, target_date: date) -> dict:
         mapping = SERIES_MAP.get(series["id"])
         if not mapping:
             log.warning(f"Okänd series-id: {series['id']} — hoppar över")
+            try:
+                import sqlite3 as _sq
+                _db = ROOT / "data" / "sigen.db"
+                _c = _sq.connect(str(_db), timeout=5)
+                _at = f"unknown_series_{series['id']}"
+                _r = _c.execute(
+                    "SELECT id FROM alerts WHERE alert_type=? "
+                    "AND ts_utc > datetime('now','-24 hours') LIMIT 1",
+                    (_at,)
+                ).fetchone()
+                if not _r:
+                    _c.execute(
+                        "INSERT INTO alerts (ts_utc, alert_type, severity, title, message, mail_sent_at) "
+                        "VALUES (datetime('now'), ?, 'warning', ?, ?, NULL)",
+                        (_at,
+                         f"Ny Sigen series-id: {series['id']}",
+                         f"Sigen API skickar ny series-id '{series['id']}' som SERIES_MAP saknar. "
+                         f"Datan hoppas over. Uppdatera SERIES_MAP i fetch_daily_5min.py.")
+                    )
+                    _c.commit()
+                    log.warning(f"-> Alert skapad for okand series {series['id']}")
+                _c.close()
+            except Exception as _e:
+                log.error(f"Kunde inte skapa alert: {_e}")
             continue
         column, sign = mapping
         for pt in series["points"]:

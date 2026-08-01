@@ -140,6 +140,13 @@ html, body {
 .bill-total .amount { font-size: 22px; font-weight: 700; }
 .bill-loading { text-align: center; padding: 40px 0; color: #86868b; }
 .bill-error { text-align: center; padding: 20px; color: #ff3b30; background: #fef0f0; border-radius: 10px; }
+.alert-banner { position: sticky; top: 0; z-index: 50; padding: 12px 16px; margin: -12px -16px 12px; border-radius: 0 0 12px 12px; display: none; }
+.alert-banner.active { display: block; }
+.alert-banner.critical { background: #ff3b30; color: #fff; }
+.alert-banner.warning { background: #ff9500; color: #fff; }
+.alert-banner-title { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+.alert-banner-msg { font-size: 13px; opacity: .95; }
+.alert-banner-more { font-size: 12px; margin-top: 6px; opacity: .85; }
 .email-section h3 { margin: 0 0 12px; font-size: 15px; font-weight: 600; color: #1d1d1f; }
 .email-input-row { display: flex; gap: 8px; margin-bottom: 8px; }
 .email-input { flex: 1; padding: 10px 12px; border: 1px solid #d2d2d7; border-radius: 8px; font-size: 15px; font-family: inherit; background: #f5f5f7; }
@@ -198,6 +205,7 @@ html, body {
 </div>
 <div style="display: flex; align-items: center; gap: 12px;">
 <div class="time" id="current-time">--:--</div>
+<div class="alert-banner" id="alert-banner" onclick="location.reload()"></div>
 <button class="refresh-btn" onclick="refresh()">↻</button>
 </div>
 </div>
@@ -804,10 +812,35 @@ async function sendExcelReport() {
   }
 }
 
+async function checkAlerts() {
+  try {
+    const resp = await fetch("/api/alerts");
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const banner = document.getElementById("alert-banner");
+    if (data.count === 0) {
+      banner.classList.remove("active", "critical", "warning");
+      return;
+    }
+    const worst = data.alerts.reduce((a, b) => 
+      (a.severity === "critical" ? a : b), data.alerts[0]);
+    const sev = data.alerts.some(a => a.severity === "critical") ? "critical" : "worst.severity";
+    banner.className = "alert-banner active " + (data.alerts.some(a => a.severity === "critical") ? "critical" : "warning");
+    banner.innerHTML = 
+      '<div class="alert-banner-title">⚠ ' + worst.title + '</div>' +
+      '<div class="alert-banner-msg">' + worst.message + '</div>' +
+      (data.count > 1 ? '<div class="alert-banner-more">+' + (data.count - 1) + ' andra larm</div>' : '');
+  } catch (e) {
+    console.error("Alert check failed:", e);
+  }
+}
+
 setClock();
 setInterval(setClock, 30000);
 refresh();
 setInterval(refresh, 60000);
+checkAlerts();
+setInterval(checkAlerts, 60000);
 </script>
 </body>
 </html>

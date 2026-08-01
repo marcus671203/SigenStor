@@ -464,3 +464,20 @@ def get_bill(period: str):
         },
         "totalt": round(totalt, 2)
     }
+
+
+@app.get("/api/alerts")
+def alerts():
+    """Hämta alla aktiva (olösta) larm för mobilappen."""
+    with connect() as conn:
+        rows = conn.execute("""
+            SELECT id, ts_utc, alert_type, severity, title, message
+            FROM alerts
+            WHERE resolved_at IS NULL
+            ORDER BY ts_utc DESC
+            LIMIT 20
+        """).fetchall()
+    return {
+        "count": len(rows),
+        "alerts": [dict(r) for r in rows]
+    }
