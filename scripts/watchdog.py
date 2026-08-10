@@ -59,6 +59,12 @@ def send_mail(subject, body):
 
 
 def raise_alert(conn, alert_type, severity, title, message):
+    # Kolla om det redan finns ett olost larm av denna typ
+    existing = conn.execute(
+        "SELECT id FROM alerts WHERE alert_type = ? AND resolved_at IS NULL LIMIT 1",
+        (alert_type,)
+    ).fetchone()
+    
     should_mail = not already_alerted(conn, alert_type)
     mail_sent_at = None
     if should_mail:
@@ -68,12 +74,27 @@ def raise_alert(conn, alert_type, severity, title, message):
             print("MAIL:", title)
         except Exception as e:
             print("Mail failed:", e)
-    conn.execute(
-        "INSERT INTO alerts (ts_utc, alert_type, severity, title, message, mail_sent_at) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (now_utc(), alert_type, severity, title, message, mail_sent_at)
-    )
-    print("ALERT", severity.upper(), "-", title, ":", message)
+    
+    if existing:
+        # Uppdatera existerande larm istallet for att skapa dubblett
+        if mail_sent_at:
+            conn.execute(
+                "UPDATE alerts SET ts_utc = ?, title = ?, message = ?, mail_sent_at = ? WHERE id = ?",
+                (now_utc(), title, message, mail_sent_at, existing["id"])
+            )
+        else:
+            conn.execute(
+                "UPDATE alerts SET ts_utc = ?, title = ?, message = ? WHERE id = ?",
+                (now_utc(), title, message, existing["id"])
+            )
+        print("ALERT", severity.upper(), "(uppdaterad) -", title, ":", message)
+    else:
+        conn.execute(
+            "INSERT INTO alerts (ts_utc, alert_type, severity, title, message, mail_sent_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (now_utc(), alert_type, severity, title, message, mail_sent_at)
+        )
+        print("ALERT", severity.upper(), "(ny) -", title, ":", message)
 
 
 def resolve_alerts(conn, alert_type):
@@ -139,7 +160,7 @@ def check_savings_anomaly(conn):
         return
     igar_kr = igar["total_kr"] or 0
     diff_procent = (igar_kr - snitt) / snitt * 100
-    if diff_procent < -50:
+    if diff_procent < -70:
         raise_alert(conn, "savings_low", "warning",
                     "Igar-besparing " + str(int(diff_procent)) + " procent under snitt",
                     "Igar (" + igar["date"] + "): " + str(round(igar_kr, 0)) + " kr. "
