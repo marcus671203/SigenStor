@@ -247,7 +247,7 @@ def build_summary(wb, all_days):
     kt_row = info_row + 2
     ws.cell(row=kt_row, column=10, value="Grand total:").font = make_font(bold=True, size=11)
     ws.cell(row=kt_row, column=10).alignment = Alignment(horizontal="right", vertical="center")
-    ws.cell(row=kt_row, column=11, value=f"=SUM(K6:K{row-1})").font = make_font(bold=True, size=11)
+    ws.cell(row=kt_row, column=11, value=sum(d["total_kr"] for d in all_days)).font = make_font(bold=True, size=11)
     ws.cell(row=kt_row, column=11).fill = PatternFill("solid", start_color=BLUE_FILL)
     ws.cell(row=kt_row, column=11).number_format = NUM_KR
     ws.cell(row=kt_row, column=11).alignment = Alignment(horizontal="right", vertical="center")
