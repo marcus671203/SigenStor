@@ -147,6 +147,7 @@ html, body {
 .alert-banner-title { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
 .alert-banner-msg { font-size: 13px; opacity: .95; }
 .alert-banner-more { font-size: 12px; margin-top: 6px; opacity: .85; }
+.ev-cost { font-size: 11px; color: #86868b; margin-top: 4px; line-height: 1.3; }
 .email-section h3 { margin: 0 0 12px; font-size: 15px; font-weight: 600; color: #1d1d1f; }
 .email-input-row { display: flex; gap: 8px; margin-bottom: 8px; }
 .email-input { flex: 1; padding: 10px 12px; border: 1px solid #d2d2d7; border-radius: 8px; font-size: 15px; font-family: inherit; background: #f5f5f7; }
@@ -228,6 +229,7 @@ html, body {
 <div class="tile" id="ev-tile">
 <div class="label">🚗 Bil (EVDC)</div>
 <div class="value" id="ev">-- <span class="unit">kW</span></div>
+<div class="ev-cost" id="ev-cost"></div>
 </div>
 <div class="tile">
 <div class="label">⚡ Elnät</div>
@@ -841,6 +843,35 @@ refresh();
 setInterval(refresh, 60000);
 checkAlerts();
 setInterval(checkAlerts, 60000);
+
+async function updateEvCost() {
+  try {
+    const resp = await fetch("/api/evdc-cost");
+    if (!resp.ok) return;
+    const d = await resp.json();
+    const el = document.getElementById("ev-cost");
+    if (!el) return;
+    if (d.evdc_lad_kwh < 0.1) {
+      el.textContent = "";
+      return;
+    }
+    const monthNames = {
+      "01": "jan", "02": "feb", "03": "mar", "04": "apr",
+      "05": "maj", "06": "jun", "07": "jul", "08": "aug",
+      "09": "sep", "10": "okt", "11": "nov", "12": "dec"
+    };
+    const mm = d.month.split("-")[0];
+    const monthLabel = monthNames[mm] || mm;
+    el.innerHTML = 
+      Math.round(d.evdc_lad_kwh) + " kWh @ " + 
+      d.snittpris.toFixed(2).replace(".", ",") + " kr/kWh (" + monthLabel + ")";
+  } catch(e) {
+    console.error("evdc-cost fetch failed:", e);
+  }
+}
+
+updateEvCost();
+setInterval(updateEvCost, 300000);
 </script>
 </body>
 </html>

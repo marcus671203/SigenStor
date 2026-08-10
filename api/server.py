@@ -481,3 +481,146 @@ def alerts():
         "count": len(rows),
         "alerts": [dict(r) for r in rows]
     }
+
+
+
+@app.get("/api/evdc-cost")
+def evdc_cost():
+    """EVDC-laddkostnad denna manad med LIFO-buffer for bat och EVDC."""
+    import json
+    from datetime import date as ddate, timedelta
+
+    today = datetime.now(TZ).date()
+    year, month = today.year, today.month
+    month_prefix = f"{year:04d}-{month:02d}"
+
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT ts_local, date_local, last_kw, bat_kw, evdc_kw, pv3_kw "
+            "FROM energy_5min_v2 ORDER BY ts_local"
+        ).fetchall()
+
+    if not rows:
+        return {"month": f"{month:02d}-{year}", "evdc_lad_kwh": 0,
+                "kostnad_kr": 0, "snittpris": 0,
+                "sol_andel_pct": 0, "bat_andel_pct": 0, "nat_andel_pct": 0}
+
+    root = Path(__file__).parent.parent
+    spot_cache = root / "data" / "spot_cache"
+    spot_lookup = {}
+    for f in spot_cache.glob("*_SE3.json"):
+        try:
+            data = json.loads(f.read_text())
+            for entry in data:
+                dt = datetime.fromisoformat(entry["time_start"].replace("Z", "+00:00"))
+                spot_lookup[(dt.date().isoformat(), dt.hour)] = entry["SEK_per_kWh"]
+        except Exception:
+            pass
+
+    H = 5 / 60.0
+    bat_buffer = []
+    evdc_buffer = []
+
+    def pop_lifo_kr(buf, kwh_needed):
+        kostnad = 0.0
+        kvar = kwh_needed
+        while kvar > 0.0001 and buf:
+            chunk = buf[-1]
+            ta = min(chunk[0], kvar)
+            kostnad += ta * chunk[1]
+            chunk[0] -= ta
+            kvar -= ta
+            if chunk[0] < 0.0001:
+                buf.pop()
+        return kostnad
+
+    m_evdc_lad_kwh = 0.0
+    m_kostnad_kr = 0.0
+    m_sol_kwh = 0.0
+    m_bat_kwh = 0.0
+    m_nat_kwh = 0.0
+
+    for r in rows:
+        ts = datetime.fromisoformat(r["ts_local"])
+        spot = spot_lookup.get((ts.date().isoformat(), ts.hour))
+        if spot is None:
+            continue
+
+        last = r["last_kw"] or 0
+        bat = r["bat_kw"] or 0
+        evdc = r["evdc_kw"] or 0
+        sol = r["pv3_kw"] or 0
+
+        bat_url = max(0, bat)
+        bat_lad = max(0, -bat)
+        evdc_lad = max(0, -evdc)
+        evdc_url = max(0, evdc)
+
+        buy_price = 1.25 * (spot + 0.604) + 0.04
+        sell_price = spot + 0.104
+
+        sol_till_last = min(sol, last)
+        sol_over = sol - sol_till_last
+        sol_till_bat = min(sol_over, bat_lad)
+        sol_over -= sol_till_bat
+        sol_till_evdc = min(sol_over, evdc_lad)
+
+        rest_last = max(0, last - sol_till_last)
+        bat_till_last = min(bat_url, rest_last)
+        bat_url_rest = bat_url - bat_till_last
+        bat_till_evdc = min(bat_url_rest, max(0, evdc_lad - sol_till_evdc))
+
+        nat_till_bat = max(0, bat_lad - sol_till_bat)
+        nat_till_evdc = max(0, evdc_lad - sol_till_evdc - bat_till_evdc)
+
+        if sol_till_bat > 0.0001:
+            bat_buffer.append([sol_till_bat * H, sell_price])
+        if nat_till_bat > 0.0001:
+            bat_buffer.append([nat_till_bat * H, buy_price])
+
+        bat_till_evdc_kr = 0.0
+        if bat_till_last > 0.0001:
+            pop_lifo_kr(bat_buffer, bat_till_last * H)
+        if bat_till_evdc > 0.0001:
+            bat_till_evdc_kr = pop_lifo_kr(bat_buffer, bat_till_evdc * H)
+        bat_till_nat = bat_url - bat_till_last - bat_till_evdc
+        if bat_till_nat > 0.0001:
+            pop_lifo_kr(bat_buffer, bat_till_nat * H)
+
+        if sol_till_evdc > 0.0001:
+            evdc_buffer.append([sol_till_evdc * H, sell_price])
+        if bat_till_evdc > 0.0001:
+            bat_avg = bat_till_evdc_kr / (bat_till_evdc * H)
+            evdc_buffer.append([bat_till_evdc * H, bat_avg])
+        if nat_till_evdc > 0.0001:
+            evdc_buffer.append([nat_till_evdc * H, buy_price])
+
+        if evdc_url > 0.0001:
+            pop_lifo_kr(evdc_buffer, evdc_url * H)
+
+        if r["date_local"].startswith(month_prefix):
+            m_evdc_lad_kwh += evdc_lad * H
+            m_sol_kwh += sol_till_evdc * H
+            m_bat_kwh += bat_till_evdc * H
+            m_nat_kwh += nat_till_evdc * H
+            m_kostnad_kr += sol_till_evdc * sell_price * H
+            m_kostnad_kr += bat_till_evdc_kr
+            m_kostnad_kr += nat_till_evdc * buy_price * H
+
+    if m_evdc_lad_kwh > 0.01:
+        snittpris = m_kostnad_kr / m_evdc_lad_kwh
+        sol_p = m_sol_kwh / m_evdc_lad_kwh * 100
+        bat_p = m_bat_kwh / m_evdc_lad_kwh * 100
+        nat_p = m_nat_kwh / m_evdc_lad_kwh * 100
+    else:
+        snittpris = sol_p = bat_p = nat_p = 0
+
+    return {
+        "month": f"{month:02d}-{year}",
+        "evdc_lad_kwh": round(m_evdc_lad_kwh, 1),
+        "kostnad_kr": round(m_kostnad_kr, 2),
+        "snittpris": round(snittpris, 3),
+        "sol_andel_pct": round(sol_p, 1),
+        "bat_andel_pct": round(bat_p, 1),
+        "nat_andel_pct": round(nat_p, 1)
+    }
