@@ -197,6 +197,8 @@ html, body {
 .day-savings .item .value.sol { color: #E8B91A; }
 .day-savings .item .value.bat { color: #8E5BBC; }
 .day-savings .item .value.total { color: #185FA5; }
+.info-icon { cursor: pointer; color: #86868b; font-size: 11px; margin-left: 3px; user-select: none; vertical-align: super; }
+.info-icon:hover { color: #185FA5; }
 
 .day-kwh {
   display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 4px;
@@ -288,10 +290,30 @@ html, body {
 <div class="value bat" id="day-bat-kr">-- kr</div>
 </div>
 <div class="item">
-<div class="label">Totalt</div>
+<div class="label">Totalt <span class="info-icon" onclick="openSavingsInfo()">ⓘ</span></div>
 <div class="value total" id="day-total-kr">-- kr</div>
 </div>
 </div>
+
+<!-- Savings info modal -->
+<div class="modal-overlay" id="savings-info-modal" onclick="if(event.target===this) closeSavingsInfo()">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">💡 Om sol- och batteri-fördelning</div>
+      <button class="modal-close" onclick="closeSavingsInfo()">×</button>
+    </div>
+    <div style="font-size: 14px; line-height: 1.5; color: #1d1d1f;">
+      <p><strong>Sol-</strong> och <strong>Batteri</strong>-siffrorna visar hur mycket värde respektive del av anläggningen skapade under dagen.</p>
+      <p>Notera att en stor del av <strong>sol</strong> kan gå via batteri eller direkt till bilens laddning utan att synas som "sol → hus". Det räknas ändå in i sol-posten.</p>
+      <p><strong>Total besparing</strong> är alltid ekonomiskt korrekt och stämmer väl med Sigenergys egna beräkningar.</p>
+      <p style="font-size: 12px; color: #86868b; margin-top: 16px;">
+        Modellen: sol och batteri prioriteras i ordning hus → batteri → bil → nät. 
+        Priset baseras på faktisk spot per 5-min-fönster.
+      </p>
+    </div>
+  </div>
+</div>
+
 <div class="day-kwh">
 <div class="item">
 <div class="label">SOL kWh</div>
@@ -866,6 +888,13 @@ refresh();
 setInterval(refresh, 60000);
 checkAlerts();
 setInterval(checkAlerts, 60000);
+
+function openSavingsInfo() {
+  document.getElementById("savings-info-modal").classList.add("active");
+}
+function closeSavingsInfo() {
+  document.getElementById("savings-info-modal").classList.remove("active");
+}
 
 async function openEvdcHistory() {
   document.getElementById("evdc-modal").classList.add("active");
