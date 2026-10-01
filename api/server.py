@@ -421,7 +421,7 @@ def get_bill(period: str):
             sal_kwh += (-grid) * H
     
     # Formler
-    elhandel_kop = (kop_kwh_vikt + kop_kwh * 0.04) * 1.25
+    elhandel_kop = kop_kwh_vikt * 1.25 + kop_kwh * 0.04  # 4-oringen inkl moms (som Sigen/savings)
     elhandel_fast = 39.0
     elhandel_sal = sal_kwh_vikt + sal_kwh * 0.104
     
@@ -465,6 +465,44 @@ def get_bill(period: str):
             "summa": round(vattenfall_tot, 2)
         },
         "totalt": round(totalt, 2)
+    }
+
+
+@app.get("/api/price/now")
+def price_now():
+    """Aktuellt kop- och saljpris per kWh inkl. alla paslag, skatter och avgifter."""
+    import json
+    from datetime import timedelta
+    now = datetime.now(TZ)
+    root = Path(__file__).parent.parent
+    f = root / "data" / "spot_cache" / f"{now.date().isoformat()}_SE3.json"
+    if not f.exists():
+        raise HTTPException(404, "Inget spotpris for idag annu")
+    entries = json.loads(f.read_text())
+    best = None
+    for e in entries:
+        dt = datetime.fromisoformat(e["time_start"].replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=TZ)
+        dt = dt.astimezone(TZ)
+        if dt <= now and (best is None or dt > best[0]):
+            best = (dt, e["SEK_per_kWh"])
+    if best is None:
+        raise HTTPException(404, "Ingen spot for aktuell kvart")
+    best_dt, spot = best
+    end_dt = best_dt + timedelta(minutes=15)
+    nat_over = 0.244 * 1.25      # natoverforing 30,5 ore inkl moms (efter 2026-04-02)
+    energiskatt = 0.45           # 45 ore/kWh inkl moms
+    # Samma formel som calculate_savings/Sigen-appen (4-oringen utanfor moms)
+    buy_total = 1.25 * (spot + 0.604) + 0.04
+    buy_elhandel = buy_total - nat_over - energiskatt
+    sell_elhandel = spot + 0.104
+    return {
+        "hour": best_dt.strftime("%H:%M") + "-" + end_dt.strftime("%H:%M"),
+        "spot": round(spot, 3),
+        "buy": {"elhandel": round(buy_elhandel, 3), "nat_overforing": round(nat_over, 3),
+                "energiskatt": round(energiskatt, 3), "total": round(buy_total, 3)},
+        "sell": {"elhandel": round(sell_elhandel, 3), "total": round(sell_elhandel, 3)},
     }
 
 

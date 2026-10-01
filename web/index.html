@@ -272,8 +272,24 @@ html, body {
 <button class="day-nav-today-btn" id="today-btn" onclick="goToToday()">Idag</button>
 </div>
 
+<div class="card" style="padding:16px;" id="price-card">
+<div class="label" style="font-size:11px;color:#6e6e73;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Aktuellt pris <span id="price-hour" style="color:#86868b;font-weight:600;">--</span></div>
+<div style="display:flex;gap:12px;">
+<div style="flex:1;background:#fdf1f3;border-radius:10px;padding:12px;">
+<div style="font-size:11px;color:#6e6e73;">KÖP (inkl. allt)</div>
+<div style="font-size:21px;font-weight:700;color:#d1495b;" id="price-buy">-- kr</div>
+<div style="font-size:10px;color:#86868b;margin-top:4px;line-height:1.4;" id="price-buy-brk"></div>
+</div>
+<div style="flex:1;background:#eef7f3;border-radius:10px;padding:12px;">
+<div style="font-size:11px;color:#6e6e73;">SÄLJ</div>
+<div style="font-size:21px;font-weight:700;color:#2e9e8f;" id="price-sell">-- kr</div>
+<div style="font-size:10px;color:#86868b;margin-top:4px;line-height:1.4;" id="price-sell-brk"></div>
+</div>
+</div>
+</div>
 <div class="card flow-card">
 <svg class="flow-chart" id="flow-chart" viewBox="0 0 480 200" preserveAspectRatio="none"></svg>
+<div id="flow-readout" style="margin-top:8px;font-size:12px;color:#1d1d1f;min-height:18px;text-align:center;">Dra i grafen för att se värden</div>
 <div class="flow-legend">
 <div class="legend-item"><span class="legend-swatch" style="background:#E8B91A"></span>Sol</div>
 <div class="legend-item"><span class="legend-swatch" style="background:#3D7BD9"></span>Last</div>
@@ -567,6 +583,27 @@ function updateSummary(s) {
   setDonut(s.grand_sol_kr || 0, s.grand_bat_kr || 0, s.grand_evdc_kr || 0);
 }
 
+let flowState = null;
+function onFlowPointer(e){
+  if(!flowState || !flowState.data.length) return;
+  const svg=document.getElementById("flow-chart");
+  const rect=svg.getBoundingClientRect();
+  const x=(e.clientX-rect.left)/rect.width*480;
+  let best=0,bd=1e9;
+  for(let i=0;i<flowState.data.length;i++){
+    const dx=Math.abs(flowState.xScale(flowState.data[i].ts_local)-x);
+    if(dx<bd){bd=dx;best=i;}
+  }
+  const r=flowState.data[best];
+  const cx=flowState.xScale(r.ts_local);
+  const line=document.getElementById("flow-cursor");
+  if(line){line.setAttribute("x1",cx);line.setAttribute("x2",cx);line.setAttribute("y1",flowState.padTop);line.setAttribute("y2",flowState.padTop+flowState.innerH);line.style.display="";}
+  const t=new Date(r.ts_local); const p2=n=>String(n).padStart(2,"0"); const fv=v=>(v||0).toFixed(2);
+  const ro=document.getElementById("flow-readout");
+  if(ro) ro.innerHTML='<b>'+p2(t.getHours())+':'+p2(t.getMinutes())+'</b> &nbsp; \u2600 '+fv(r.pv3_kw)+' &nbsp; \uD83C\uDFE0 '+fv(r.last_kw)+' &nbsp; \uD83D\uDD0B '+fv(r.bat_kw)+' &nbsp; \uD83D\uDE97 '+fv(r.evdc_kw)+' &nbsp; \u26A1 '+fv(r.grid_kw)+' kW';
+}
+function hideFlowCursor(){ const l=document.getElementById("flow-cursor"); if(l) l.style.display="none"; }
+
 function renderFlowChart(payload) {
   const svg = document.getElementById("flow-chart");
   const data = payload.data || [];
@@ -646,7 +683,16 @@ function renderFlowChart(payload) {
   svgContent += '<path d="' + pathFor("bat_kw") + '" stroke="#8E5BBC" stroke-width="1.5" fill="none"/>';
   svgContent += '<path d="' + pathFor("grid_kw") + '" stroke="#6e6e73" stroke-width="1" fill="none" opacity="0.7"/>';
 
+  svgContent += '<line id="flow-cursor" x1="0" x2="0" y1="0" y2="0" stroke="#1d1d1f" stroke-width="0.8" style="display:none;pointer-events:none;"/>';
   svg.innerHTML = svgContent;
+  flowState = { data: data, xScale: xScale, padTop: padTop, innerH: innerH };
+  if (!svg._scrubInit) {
+    svg._scrubInit = true;
+    svg.style.touchAction = "none";
+    svg.addEventListener("pointermove", onFlowPointer);
+    svg.addEventListener("pointerdown", onFlowPointer);
+    svg.addEventListener("pointerleave", hideFlowCursor);
+  }
 
   const summary = payload.summary;
   if (summary) {
@@ -713,10 +759,27 @@ async function loadDayData() {
   }
 }
 
+async function loadPriceNow(){
+  try{
+    const r=await fetch(API+"/price/now");
+    if(!r.ok){ document.getElementById("price-card").style.display="none"; return; }
+    const p=await r.json();
+    document.getElementById("price-card").style.display="";
+    const ore=v=>Math.round(v*100).toLocaleString("sv-SE")+" öre";
+    const kr=v=>v.toLocaleString("sv-SE",{minimumFractionDigits:2,maximumFractionDigits:2})+" kr";
+    document.getElementById("price-hour").textContent=p.hour;
+    document.getElementById("price-buy").textContent=kr(p.buy.total);
+    document.getElementById("price-buy-brk").textContent="spot "+ore(p.spot)+" + elh "+ore(p.buy.elhandel)+" + nät "+ore(p.buy.nat_overforing)+" + skatt "+ore(p.buy.energiskatt);
+    document.getElementById("price-sell").textContent=kr(p.sell.total);
+    document.getElementById("price-sell-brk").textContent="spot "+ore(p.spot)+" + påslag "+ore(0.104);
+  }catch(e){ console.error("pris", e); }
+}
+
 async function refresh() {
   try {
     todayDate = todayLocalISO();
     if (!selectedDate) selectedDate = todayDate;
+    loadPriceNow();
 
     if (earliestDate === null) {
       const dates = await fetchAvailableDates();
