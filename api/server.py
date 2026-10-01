@@ -215,7 +215,8 @@ def summary():
             "SELECT COUNT(*) as days, "
             "SUM(total_kr) as grand_total, "
             "SUM(sol_kr) as grand_sol, "
-            "SUM(bat_kr) as grand_bat "
+            "SUM(bat_kr) as grand_bat, "
+            "SUM(evdc_kr) as grand_evdc "
             "FROM daily_summary"
         ).fetchone()
 
@@ -242,6 +243,7 @@ def summary():
         "grand_total_kr": grand["grand_total"] if grand else 0,
         "grand_sol_kr": grand["grand_sol"] if grand else 0,
         "grand_bat_kr": grand["grand_bat"] if grand else 0,
+        "grand_evdc_kr": grand["grand_evdc"] if grand else 0,
         "monthly": [dict(r) for r in monthly],
         "last_30_days": [dict(r) for r in reversed(last_30)],
     }

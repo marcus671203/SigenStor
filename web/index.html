@@ -344,6 +344,22 @@ html, body {
 </div>
 </div>
 
+<div class="card" style="padding:16px;">
+<div class="label" style="font-size:11px;color:#6e6e73;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Fördelning (livstid)</div>
+<div style="display:flex;align-items:center;gap:16px;">
+<svg width="118" height="118" viewBox="0 0 42 42" style="flex:0 0 auto;transform:rotate(-90deg);">
+<circle cx="21" cy="21" r="15.9155" fill="none" stroke="#eee" stroke-width="6"></circle>
+<circle id="donut-sol" cx="21" cy="21" r="15.9155" fill="none" stroke="#E8B91A" stroke-width="6" stroke-dasharray="0 100" stroke-dashoffset="0"></circle>
+<circle id="donut-bat" cx="21" cy="21" r="15.9155" fill="none" stroke="#8E5BBC" stroke-width="6" stroke-dasharray="0 100" stroke-dashoffset="0"></circle>
+<circle id="donut-evdc" cx="21" cy="21" r="15.9155" fill="none" stroke="#2E9E8F" stroke-width="6" stroke-dasharray="0 100" stroke-dashoffset="0"></circle>
+</svg>
+<div style="flex:1;font-size:13px;">
+<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#E8B91A;margin-right:6px;"></span>Solceller</span><span id="donut-sol-pct" style="font-weight:600;">--%</span></div>
+<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#8E5BBC;margin-right:6px;"></span>Hembatteri</span><span id="donut-bat-pct" style="font-weight:600;">--%</span></div>
+<div style="display:flex;justify-content:space-between;"><span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#2E9E8F;margin-right:6px;"></span>EVDC</span><span id="donut-evdc-pct" style="font-weight:600;">--%</span></div>
+</div>
+</div>
+</div>
 <div class="card" style="padding: 16px;">
 <div class="stats">
 <div class="stat">
@@ -499,6 +515,24 @@ function updateLive(d) {
   }
 }
 
+function setDonut(sol, bat, evdc) {
+  const total = sol + bat + evdc;
+  const pct = v => total > 0 ? (v / total) * 100 : 0;
+  const ps = pct(sol), pb = pct(bat), pe = pct(evdc);
+  const seg = (id, len, accum) => {
+    const el = document.getElementById(id); const v = Math.max(0, len);
+    el.setAttribute("stroke-dasharray", v + " " + (100 - v));
+    el.setAttribute("stroke-dashoffset", (-accum).toString());
+  };
+  seg("donut-sol", ps, 0);
+  seg("donut-bat", pb, Math.max(0,ps));
+  seg("donut-evdc", pe, Math.max(0,ps) + Math.max(0,pb));
+  const f = v => v.toLocaleString("sv-SE",{maximumFractionDigits:1}) + "%";
+  document.getElementById("donut-sol-pct").textContent = f(ps);
+  document.getElementById("donut-bat-pct").textContent = f(pb);
+  document.getElementById("donut-evdc-pct").textContent = f(pe);
+}
+
 function updateSummary(s) {
   const last7 = (s.last_30_days || []).slice(-7);
   const chartEl = document.getElementById("chart");
@@ -530,6 +564,7 @@ function updateSummary(s) {
   const totalDays = s.total_days || 0;
   const yearEst = totalDays > 0 ? (s.grand_total_kr / totalDays) * 365 : 0;
   document.getElementById("year-est").textContent = formatKr(yearEst);
+  setDonut(s.grand_sol_kr || 0, s.grand_bat_kr || 0, s.grand_evdc_kr || 0);
 }
 
 function renderFlowChart(payload) {

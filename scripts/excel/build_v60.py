@@ -258,6 +258,48 @@ def build_summary(wb, all_days):
     for c, w in widths.items():
         ws.column_dimensions[c].width = w
 
+    # ── Livstidsfördelning + tårtdiagram ─────────────────────────────
+    from openpyxl.chart import PieChart, Reference
+    from openpyxl.chart.marker import DataPoint
+    PIE_COLORS = ["E8B91A", "8E5BBC", "2E9E8F"]
+    life_sol = sum(d["sol_kr"] for d in all_days)
+    life_bat = sum(d["bat_kr"] for d in all_days)
+    life_evdc = sum((d.get("evdc_kr") or 0) for d in all_days)
+    life_total = life_sol + life_bat + life_evdc
+    base = kt_row + 2
+    ws.cell(row=base, column=1, value="LIVSTIDSFÖRDELNING").font = make_font(bold=True, size=11, color=WHITE)
+    ws.cell(row=base, column=1).fill = PatternFill("solid", start_color=NAVY)
+    ws.cell(row=base, column=1).alignment = Alignment(horizontal="center", vertical="center")
+    ws.merge_cells(start_row=base, start_column=1, end_row=base, end_column=3)
+    hdr = base + 1
+    for col, val in [(1, "System"), (2, "kr"), (3, "andel")]:
+        c = ws.cell(row=hdr, column=col, value=val)
+        c.font = make_font(bold=True, size=10, color=WHITE)
+        c.fill = PatternFill("solid", start_color=BLUE)
+        c.alignment = Alignment(horizontal="center", vertical="center")
+    rows_spec = [("Solceller", life_sol, SOL_ORANGE), ("Hembatteri", life_bat, BAT_RED), ("EVDC", life_evdc, EVDC_PURPLE)]
+    for i, (name, kr, fill) in enumerate(rows_spec):
+        r = hdr + 1 + i
+        c = ws.cell(row=r, column=1, value=name); c.font = make_font(bold=True, size=10, color=WHITE)
+        c.fill = PatternFill("solid", start_color=fill)
+        c = ws.cell(row=r, column=2, value=kr); c.number_format = NUM_KR
+        c.alignment = Alignment(horizontal="right", vertical="center")
+        c = ws.cell(row=r, column=3, value=(kr / life_total if life_total else 0)); c.number_format = NUM_PCT
+        c.alignment = Alignment(horizontal="right", vertical="center")
+    tr = hdr + 1 + len(rows_spec)
+    ws.cell(row=tr, column=1, value="Totalt").font = make_font(bold=True, size=10)
+    c = ws.cell(row=tr, column=2, value=life_total); c.number_format = NUM_KR
+    c.font = make_font(bold=True, size=10); c.alignment = Alignment(horizontal="right", vertical="center")
+    pie = PieChart()
+    pie.add_data(Reference(ws, min_col=2, min_row=hdr, max_row=hdr + len(rows_spec)), titles_from_data=True)
+    pie.set_categories(Reference(ws, min_col=1, min_row=hdr + 1, max_row=hdr + len(rows_spec)))
+    pie.title = "Livstidsfördelning besparing"; pie.height = 7.5; pie.width = 12
+    pts = []
+    for i, col in enumerate(PIE_COLORS):
+        dp = DataPoint(idx=i); dp.graphicalProperties.solidFill = col; pts.append(dp)
+    pie.series[0].data_points = pts
+    ws.add_chart(pie, f"E{base}")
+
 
 def build_month(wb, year, month, days):
     name = MONTH_NAMES_SV[month]
