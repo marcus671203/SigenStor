@@ -415,10 +415,6 @@ html, body {
       <div class="modal-title">Elräkning</div>
       <button class="modal-close" onclick="closeBillModal()">×</button>
     </div>
-    <div class="tab-row">
-      <button class="tab-btn active" id="tab-current" onclick="switchBillTab('current')">Denna månad</button>
-      <button class="tab-btn" id="tab-previous" onclick="switchBillTab('previous')">Förra månaden</button>
-    </div>
     <div id="bill-content"><div class="bill-loading">Laddar...</div></div>
   </div>
 </div>
@@ -806,59 +802,20 @@ async function refresh() {
 }
 
 // Elräkning-modal
-let currentBillTab = "current";
-let billCache = {};
 
 function fmt(n) { return (n||0).toLocaleString("sv-SE", {minimumFractionDigits:0, maximumFractionDigits:0}) + " kr"; }
 function fmtKwh(n) { return (n||0).toLocaleString("sv-SE", {minimumFractionDigits:1, maximumFractionDigits:1}) + " kWh"; }
 function fmtSpot(n) { return (n||0).toLocaleString("sv-SE", {minimumFractionDigits:3, maximumFractionDigits:3}) + " kr/kWh"; }
 
-async function openBillModal() {
-  document.getElementById("bill-modal").classList.add("active");
-  await loadBill(currentBillTab);
-}
-
-function closeBillModal() {
-  document.getElementById("bill-modal").classList.remove("active");
-}
-
-async function switchBillTab(period) {
-  currentBillTab = period;
-  document.getElementById("tab-current").classList.toggle("active", period === "current");
-  document.getElementById("tab-previous").classList.toggle("active", period === "previous");
-  await loadBill(period);
-}
-
-async function loadBill(period) {
-  const container = document.getElementById("bill-content");
-  container.innerHTML = '<div class="bill-loading">Laddar...</div>';
-  
-  try {
-    let data = billCache[period];
-    if (!data) {
-      const resp = await fetch(`/api/bill/${period}`);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      data = await resp.json();
-      billCache[period] = data;
-    }
-    
-    if (data.error) {
-      container.innerHTML = `<div class="bill-error">${data.error}</div>`;
-      return;
-    }
-    
-    const eh = data.elhandel;
-    const vf = data.vattenfall;
-    
-    container.innerHTML = `
+function renderBillDetail(data) {
+  const eh = data.elhandel, vf = data.vattenfall;
+  return `
       <div class="bill-summary">
-        <div class="row"><span>Period:</span><b>${data.period}</b></div>
         <div class="row"><span>Köpt från nätet:</span><b>${fmtKwh(data.kop_kwh)}</b></div>
         <div class="row"><span>Sålt till nätet:</span><b>${fmtKwh(data.sal_kwh)}</b></div>
         <div class="row"><span>Snitt spot köp:</span><b>${fmtSpot(data.snitt_spot_kop)}</b></div>
         <div class="row"><span>Snitt spot sälj:</span><b>${fmtSpot(data.snitt_spot_sal)}</b></div>
       </div>
-      
       <div class="bill-section">
         <div class="bill-section-title">Elhandelsbolag</div>
         <div class="bill-row"><span>Köp (spot+0,04)×1,25</span><span>${fmt(eh.kop)}</span></div>
@@ -866,7 +823,6 @@ async function loadBill(period) {
         <div class="bill-row negative"><span>Intäkt sålt el</span><span>−${fmt(eh.salj_intakt)}</span></div>
         <div class="bill-row total"><span>Summa elhandel</span><span>${fmt(eh.summa)}</span></div>
       </div>
-      
       <div class="bill-section">
         <div class="bill-section-title">Vattenfall (nät + skatt)</div>
         <div class="bill-row"><span>Nätöverföring ${vf.nat_overforing_rate_ore.toString().replace(".",",")} öre</span><span>${fmt(vf.nat_overforing)}</span></div>
@@ -874,15 +830,34 @@ async function loadBill(period) {
         <div class="bill-row"><span>Fast abonnemang</span><span>${fmt(vf.fast)}</span></div>
         <div class="bill-row total"><span>Summa Vattenfall</span><span>${fmt(vf.summa)}</span></div>
       </div>
-      
-      <div class="bill-total">
-        <div class="label">TOTALT</div>
-        <div class="amount">${fmt(data.totalt)}</div>
-      </div>
-    `;
+      <div class="bill-total"><div class="label">TOTALT</div><div class="amount">${fmt(data.totalt)}</div></div>`;
+}
+
+async function loadBillHistory() {
+  const container = document.getElementById("bill-content");
+  container.innerHTML = '<div class="bill-loading">Laddar...</div>';
+  try {
+    const resp = await fetch("/api/bill-history?months=6");
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const months = (await resp.json()).months || [];
+    if (!months.length) { container.innerHTML = '<div class="bill-error">Ingen data</div>'; return; }
+    container.innerHTML = months.map((m, i) => {
+      const head = `<summary style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:11px 2px;font-weight:600;border-bottom:1px solid #eee;"><span>${m.period}</span><span>${m.error ? "–" : fmt(m.totalt)}</span></summary>`;
+      const body = m.error ? `<div class="bill-error">${m.error}</div>` : renderBillDetail(m);
+      return `<details${i===0?" open":""}>${head}${body}</details>`;
+    }).join("");
   } catch (e) {
     container.innerHTML = `<div class="bill-error">Fel: ${e.message}</div>`;
   }
+}
+
+async function openBillModal() {
+  document.getElementById("bill-modal").classList.add("active");
+  await loadBillHistory();
+}
+
+function closeBillModal() {
+  document.getElementById("bill-modal").classList.remove("active");
 }
 
 // Excel-mail knapp

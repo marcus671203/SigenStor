@@ -347,29 +347,7 @@ def send_excel_status(job_id: str):
     return EMAIL_JOBS[job_id]
 
 
-@app.get("/api/bill/{period}")
-def get_bill(period: str):
-    """Beräkna elräkning för aktuell eller föregående månad.
-    
-    period: 'current' eller 'previous'
-    """
-    from datetime import date
-    import json
-    
-    today = datetime.now(TZ).date()
-    
-    if period == "current":
-        year, month = today.year, today.month
-        label = f"{month:02d}-{year} (pågående)"
-    elif period == "previous":
-        if today.month == 1:
-            year, month = today.year - 1, 12
-        else:
-            year, month = today.year, today.month - 1
-        label = f"{month:02d}-{year}"
-    else:
-        raise HTTPException(400, "period måste vara 'current' eller 'previous'")
-    
+def _compute_bill(year, month, label):
     # Hämta alla 5-min-rader för månaden
     month_pattern = f"{year:04d}-{month:02d}%"
     with connect() as conn:
@@ -454,6 +432,48 @@ def get_bill(period: str):
         },
         "totalt": round(totalt, 2)
     }
+
+
+@app.get("/api/bill/{period}")
+def get_bill(period: str):
+    """Beräkna elräkning för aktuell eller föregående månad.
+    
+    period: 'current' eller 'previous'
+    """
+    from datetime import date
+    import json
+    
+    today = datetime.now(TZ).date()
+    
+    if period == "current":
+        year, month = today.year, today.month
+        label = f"{month:02d}-{year} (pågående)"
+    elif period == "previous":
+        if today.month == 1:
+            year, month = today.year - 1, 12
+        else:
+            year, month = today.year, today.month - 1
+        label = f"{month:02d}-{year}"
+    else:
+        raise HTTPException(400, "period måste vara 'current' eller 'previous'")
+    
+    return _compute_bill(year, month, label)
+
+
+
+@app.get("/api/bill-history")
+def bill_history(months: int = Query(6, ge=1, le=24)):
+    """Elräkning för de senaste N månaderna (nyast först)."""
+    today = datetime.now(TZ).date()
+    y, m = today.year, today.month
+    out = []
+    for i in range(months):
+        label = f"{m:02d}-{y} (pågående)" if i == 0 else f"{m:02d}-{y}"
+        out.append(_compute_bill(y, m, label))
+        m -= 1
+        if m == 0:
+            m = 12; y -= 1
+    return {"months": out}
 
 
 @app.get("/api/price/now")
