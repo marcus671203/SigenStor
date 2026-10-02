@@ -26,3 +26,4 @@ cd
 # Python
 *.pyc
 *.pyo
+*.bak*
