@@ -767,7 +767,7 @@ async function loadPriceNow(){
     document.getElementById("price-card").style.display="";
     const ore=v=>Math.round(v*100).toLocaleString("sv-SE")+" öre";
     const kr=v=>v.toLocaleString("sv-SE",{minimumFractionDigits:2,maximumFractionDigits:2})+" kr";
-    document.getElementById("price-hour").textContent=p.hour;
+    document.getElementById("price-hour").textContent = p.stale ? (p.hour + " (äldre pris)") : p.hour;
     document.getElementById("price-buy").textContent=kr(p.buy.total);
     document.getElementById("price-buy-brk").textContent="spot "+ore(p.spot)+" + elh "+ore(p.buy.elhandel)+" + nät "+ore(p.buy.nat_overforing)+" + skatt "+ore(p.buy.energiskatt);
     document.getElementById("price-sell").textContent=kr(p.sell.total);

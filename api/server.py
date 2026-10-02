@@ -20,7 +20,8 @@ from dotenv import load_dotenv
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 from db import connect
 from prices import (buy_price as calc_buy, sell_price as calc_sell,
-                    grid_transfer_rate, energy_tax, elhandel_markup)
+                    grid_transfer_rate, energy_tax, elhandel_markup,
+                    load_spot_lookup, lookup_spot)
 
 # Ladda .env för mail-credentials
 load_dotenv(Path(__file__).parent.parent / ".env")
@@ -384,22 +385,11 @@ def get_bill(period: str):
             "kop_kwh": 0, "sal_kwh": 0, "totalt": 0
         }
     
-    # Ladda spot-priser
+    # Ladda spot-priser (kvartsupplöst, delad loader i prices.py)
     root = Path(__file__).parent.parent
     spot_cache = root / "data" / "spot_cache"
-    spot_lookup = {}
     from datetime import date as ddate, timedelta
-    d = ddate(year, month, 1)
-    while d.month == month:
-        f = spot_cache / f"{d.isoformat()}_SE3.json"
-        if f.exists():
-            data = json.loads(f.read_text())
-            for entry in data:
-                ts_start = entry["time_start"]
-                price = entry["SEK_per_kWh"]
-                dt = datetime.fromisoformat(ts_start.replace("Z", "+00:00"))
-                spot_lookup[(dt.date().isoformat(), dt.hour)] = price
-        d += timedelta(days=1)
+    spot_lookup = load_spot_lookup(spot_cache)
     
     # Räkna
     H = 5/60.0
@@ -411,8 +401,7 @@ def get_bill(period: str):
     for r in rows:
         ts = datetime.fromisoformat(r["ts_local"])
         grid = r["grid_kw"] or 0
-        key = (ts.date().isoformat(), ts.hour)
-        spot = spot_lookup.get(key)
+        spot = lookup_spot(spot_lookup, ts)
         if spot is None:
             continue
         if grid > 0:
@@ -474,10 +463,13 @@ def price_now():
     from datetime import timedelta
     now = datetime.now(TZ)
     root = Path(__file__).parent.parent
-    f = root / "data" / "spot_cache" / f"{now.date().isoformat()}_SE3.json"
-    if not f.exists():
-        raise HTTPException(404, "Inget spotpris for idag annu")
-    entries = json.loads(f.read_text())
+    entries = []
+    for dd in (now.date(), now.date() - timedelta(days=1)):
+        fp = root / "data" / "spot_cache" / f"{dd.isoformat()}_SE3.json"
+        if fp.exists():
+            entries += json.loads(fp.read_text())
+    if not entries:
+        raise HTTPException(404, "Inget spotpris tillgangligt")
     best = None
     for e in entries:
         dt = datetime.fromisoformat(e["time_start"].replace("Z", "+00:00"))
@@ -490,6 +482,7 @@ def price_now():
         raise HTTPException(404, "Ingen spot for aktuell kvart")
     best_dt, spot = best
     end_dt = best_dt + timedelta(minutes=15)
+    stale = best_dt < now - timedelta(minutes=15)
     today = now.date()
     nat_over = grid_transfer_rate(today)
     energiskatt = energy_tax(today)
@@ -502,6 +495,8 @@ def price_now():
         "buy": {"elhandel": round(buy_elhandel, 3), "nat_overforing": round(nat_over, 3),
                 "energiskatt": round(energiskatt, 3), "total": round(buy_total, 3)},
         "sell": {"elhandel": round(sell_elhandel, 3), "total": round(sell_elhandel, 3)},
+        "stale": stale,
+        "price_time": best_dt.strftime("%Y-%m-%d %H:%M"),
     }
 
 
@@ -546,15 +541,7 @@ def evdc_cost():
 
     root = Path(__file__).parent.parent
     spot_cache = root / "data" / "spot_cache"
-    spot_lookup = {}
-    for f in spot_cache.glob("*_SE3.json"):
-        try:
-            data = json.loads(f.read_text())
-            for entry in data:
-                dt = datetime.fromisoformat(entry["time_start"].replace("Z", "+00:00"))
-                spot_lookup[(dt.date().isoformat(), dt.hour)] = entry["SEK_per_kWh"]
-        except Exception:
-            pass
+    spot_lookup = load_spot_lookup(spot_cache)
 
     H = 5 / 60.0
     bat_buffer = []
@@ -581,7 +568,7 @@ def evdc_cost():
 
     for r in rows:
         ts = datetime.fromisoformat(r["ts_local"])
-        spot = spot_lookup.get((ts.date().isoformat(), ts.hour))
+        spot = lookup_spot(spot_lookup, ts)
         if spot is None:
             continue
 
@@ -683,15 +670,7 @@ def evdc_history():
 
     root = Path(__file__).parent.parent
     spot_cache = root / "data" / "spot_cache"
-    spot_lookup = {}
-    for f in spot_cache.glob("*_SE3.json"):
-        try:
-            data = json.loads(f.read_text())
-            for entry in data:
-                dt = datetime.fromisoformat(entry["time_start"].replace("Z", "+00:00"))
-                spot_lookup[(dt.date().isoformat(), dt.hour)] = entry["SEK_per_kWh"]
-        except Exception:
-            pass
+    spot_lookup = load_spot_lookup(spot_cache)
 
     H = 5 / 60.0
     bat_buffer = []
@@ -714,7 +693,7 @@ def evdc_history():
 
     for r in rows:
         ts = datetime.fromisoformat(r["ts_local"])
-        spot = spot_lookup.get((ts.date().isoformat(), ts.hour))
+        spot = lookup_spot(spot_lookup, ts)
         if spot is None:
             continue
 
