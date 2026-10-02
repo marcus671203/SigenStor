@@ -19,6 +19,8 @@ from dotenv import load_dotenv
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 from db import connect
+from prices import (buy_price as calc_buy, sell_price as calc_sell,
+                    grid_transfer_rate, energy_tax, elhandel_markup)
 
 # Ladda .env för mail-credentials
 load_dotenv(Path(__file__).parent.parent / ".env")
@@ -421,7 +423,7 @@ def get_bill(period: str):
             sal_kwh += (-grid) * H
     
     # Formler
-    elhandel_kop = kop_kwh_vikt * 1.25 + kop_kwh * 0.04  # 4-oringen inkl moms (som Sigen/savings)
+    elhandel_kop = kop_kwh_vikt * 1.25 + kop_kwh * elhandel_markup(ddate(year, month, 15))
     elhandel_fast = 39.0
     elhandel_sal = sal_kwh_vikt + sal_kwh * 0.104
     
@@ -430,13 +432,10 @@ def get_bill(period: str):
     #   Efter: 24.4 öre/kWh exkl moms = 30.5 öre/kWh inkl moms
     CONTRACT_CHANGE = ddate(2026, 4, 2)
     period_date = ddate(year, month, 15)  # mitten av månaden avgör
-    if period_date >= CONTRACT_CHANGE:
-        nat_over_rate = 0.244 * 1.25  # 30.5 öre inkl moms
-    else:
-        nat_over_rate = 0.445
+    nat_over_rate = grid_transfer_rate(period_date)
     nat_over = kop_kwh * nat_over_rate
     
-    energiskatt = kop_kwh * 0.45
+    energiskatt = kop_kwh * energy_tax(period_date)
     nat_fast = 6468 * 1.25 / 12
     
     elhandel_tot = elhandel_kop + elhandel_fast - elhandel_sal
@@ -491,12 +490,12 @@ def price_now():
         raise HTTPException(404, "Ingen spot for aktuell kvart")
     best_dt, spot = best
     end_dt = best_dt + timedelta(minutes=15)
-    nat_over = 0.244 * 1.25      # natoverforing 30,5 ore inkl moms (efter 2026-04-02)
-    energiskatt = 0.45           # 45 ore/kWh inkl moms
-    # Samma formel som calculate_savings/Sigen-appen (4-oringen utanfor moms)
-    buy_total = 1.25 * (spot + 0.604) + 0.04
+    today = now.date()
+    nat_over = grid_transfer_rate(today)
+    energiskatt = energy_tax(today)
+    buy_total = calc_buy(spot, today)
     buy_elhandel = buy_total - nat_over - energiskatt
-    sell_elhandel = spot + 0.104
+    sell_elhandel = calc_sell(spot, today)
     return {
         "hour": best_dt.strftime("%H:%M") + "-" + end_dt.strftime("%H:%M"),
         "spot": round(spot, 3),
@@ -596,8 +595,8 @@ def evdc_cost():
         evdc_lad = max(0, -evdc)
         evdc_url = max(0, evdc)
 
-        buy_price = 1.25 * (spot + 0.604) + 0.04
-        sell_price = spot + 0.104
+        buy_price = calc_buy(spot, ts.date())
+        sell_price = calc_sell(spot, ts.date())
 
         sol_till_last = min(sol, last)
         sol_over = sol - sol_till_last
@@ -729,8 +728,8 @@ def evdc_history():
         evdc_lad = max(0, -evdc)
         evdc_url = max(0, evdc)
 
-        buy_price = 1.25 * (spot + 0.604) + 0.04
-        sell_price = spot + 0.104
+        buy_price = calc_buy(spot, ts.date())
+        sell_price = calc_sell(spot, ts.date())
 
         sol_till_last = min(sol, last)
         sol_over = sol - sol_till_last

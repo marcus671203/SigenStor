@@ -69,18 +69,7 @@ def build_spot_lookup(spots):
     return lookup
 
 
-def buy_price(spot, the_date):
-    if the_date < CONTRACT_2026:
-        return 1.25 * spot + 0.9532
-    if the_date < CONTRACT_CHANGE:
-        return 1.25 * spot + 0.935
-    return 1.25 * (spot + 0.604) + 0.04
-
-
-def sell_price(spot, the_date):
-    if the_date < CONTRACT_2026:
-        return spot + 0.72
-    return spot + 0.104
+from prices import buy_price, sell_price  # enda sanning (scripts/prices.py)
 
 
 def calculate_day(target_date, evdc_buffer=None):
