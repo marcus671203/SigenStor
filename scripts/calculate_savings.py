@@ -160,7 +160,7 @@ def calculate_day(target_date, evdc_buffer=None):
             skipped += 1
             continue
 
-        bp = buy_price(spot, target_date)
+        bp = buy_price(spot, ts)
         sp = sell_price(spot, target_date)
 
         bat_lad_nat += -gtb * bp * H
