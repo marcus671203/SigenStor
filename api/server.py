@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 from db import connect
 from prices import (buy_price as calc_buy, sell_price as calc_sell,
-                    grid_transfer_rate, energy_tax, elhandel_markup,
+                    grid_transfer_rate, energy_tax, elhandel_markup, elhandel_fixed,
                     load_spot_lookup, lookup_spot)
 
 # Ladda .env för mail-credentials
@@ -375,6 +375,9 @@ def _compute_bill(year, month, label):
     kop_kwh = 0.0
     sal_kwh_vikt = 0.0
     sal_kwh = 0.0
+    nat_over = 0.0
+    nat_peak_kwh = 0.0; nat_peak_kr = 0.0
+    nat_off_kwh = 0.0; nat_off_kr = 0.0
     
     for r in rows:
         ts = datetime.fromisoformat(r["ts_local"])
@@ -385,23 +388,25 @@ def _compute_bill(year, month, label):
         if grid > 0:
             kop_kwh_vikt += grid * spot * H
             kop_kwh += grid * H
+            _rate = grid_transfer_rate(ts)
+            nat_over += grid * _rate * H
+            if _rate > 0.5:
+                nat_peak_kwh += grid * H; nat_peak_kr += grid * _rate * H
+            else:
+                nat_off_kwh += grid * H; nat_off_kr += grid * _rate * H
         else:
             sal_kwh_vikt += (-grid) * spot * H
             sal_kwh += (-grid) * H
     
     # Formler
-    elhandel_kop = kop_kwh_vikt * 1.25 + kop_kwh * elhandel_markup(ddate(year, month, 15))
-    elhandel_fast = 39.0
+    period_date = ddate(year, month, 15)  # datumberoende delar (fast, markup, skatt)
+    elhandel_kop = kop_kwh_vikt * 1.25 + kop_kwh * elhandel_markup(period_date)
+    elhandel_fast = elhandel_fixed(period_date)
     elhandel_sal = sal_kwh_vikt + sal_kwh * 0.104
-    
-    # Nätöverföring: bytte 2026-04-02
-    #   Före:  44.5 öre/kWh inkl moms
-    #   Efter: 24.4 öre/kWh exkl moms = 30.5 öre/kWh inkl moms
-    CONTRACT_CHANGE = ddate(2026, 4, 2)
-    period_date = ddate(year, month, 15)  # mitten av månaden avgör
-    nat_over_rate = grid_transfer_rate(period_date)
-    nat_over = kop_kwh * nat_over_rate
-    
+
+    # Nätöverföring ackumuleras per kvart i loopen (tidstariff nov–mar)
+    nat_over_rate = (nat_over / kop_kwh) if kop_kwh else 0.0  # effektiv snittsats inkl moms
+
     energiskatt = kop_kwh * energy_tax(period_date)
     nat_fast = 6468 * 1.25 / 12
     
@@ -426,6 +431,10 @@ def _compute_bill(year, month, label):
         "vattenfall": {
             "nat_overforing": round(nat_over, 2),
             "nat_overforing_rate_ore": round(nat_over_rate * 100, 1),
+            "nat_peak_kwh": round(nat_peak_kwh, 1),
+            "nat_peak_kr": round(nat_peak_kr, 2),
+            "nat_off_kwh": round(nat_off_kwh, 1),
+            "nat_off_kr": round(nat_off_kr, 2),
             "energiskatt": round(energiskatt, 2),
             "fast": round(nat_fast, 2),
             "summa": round(vattenfall_tot, 2)
@@ -504,9 +513,9 @@ def price_now():
     end_dt = best_dt + timedelta(minutes=15)
     stale = best_dt < now - timedelta(minutes=15)
     today = now.date()
-    nat_over = grid_transfer_rate(today)
+    nat_over = grid_transfer_rate(now)
     energiskatt = energy_tax(today)
-    buy_total = calc_buy(spot, today)
+    buy_total = calc_buy(spot, now)
     buy_elhandel = buy_total - nat_over - energiskatt
     sell_elhandel = calc_sell(spot, today)
     return {
@@ -602,7 +611,7 @@ def evdc_cost():
         evdc_lad = max(0, -evdc)
         evdc_url = max(0, evdc)
 
-        buy_price = calc_buy(spot, ts.date())
+        buy_price = calc_buy(spot, ts)
         sell_price = calc_sell(spot, ts.date())
 
         sol_till_last = min(sol, last)
@@ -727,7 +736,7 @@ def evdc_history():
         evdc_lad = max(0, -evdc)
         evdc_url = max(0, evdc)
 
-        buy_price = calc_buy(spot, ts.date())
+        buy_price = calc_buy(spot, ts)
         sell_price = calc_sell(spot, ts.date())
 
         sol_till_last = min(sol, last)
