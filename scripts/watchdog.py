@@ -29,7 +29,7 @@ TZ = ZoneInfo("Europe/Stockholm")
 GMAIL_USER = os.environ["GMAIL_USER"]
 GMAIL_PW = os.environ["GMAIL_APP_PASSWORD"]
 ALERT_TO = "marcuslif@gmail.com"
-COOLDOWN_HOURS = 1
+COOLDOWN_HOURS = 168  # 7 dygn: ett mail per larm, inte ett per timme
 
 
 def now_utc():
