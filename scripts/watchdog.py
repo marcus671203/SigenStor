@@ -79,13 +79,13 @@ def raise_alert(conn, alert_type, severity, title, message):
         # Uppdatera existerande larm istallet for att skapa dubblett
         if mail_sent_at:
             conn.execute(
-                "UPDATE alerts SET ts_utc = ?, title = ?, message = ?, mail_sent_at = ? WHERE id = ?",
-                (now_utc(), title, message, mail_sent_at, existing["id"])
+                "UPDATE alerts SET title = ?, message = ?, mail_sent_at = ? WHERE id = ?",
+                (title, message, mail_sent_at, existing["id"])
             )
         else:
             conn.execute(
-                "UPDATE alerts SET ts_utc = ?, title = ?, message = ? WHERE id = ?",
-                (now_utc(), title, message, existing["id"])
+                "UPDATE alerts SET title = ?, message = ? WHERE id = ?",
+                (title, message, existing["id"])
             )
         print("ALERT", severity.upper(), "(uppdaterad) -", title, ":", message)
     else:
@@ -147,7 +147,7 @@ def check_5min_freshness(conn):
 
 def check_savings_anomaly(conn):
     rows = conn.execute("""
-        SELECT date, total_kr FROM daily_summary
+        SELECT date, total_kr, sol_kwh FROM daily_summary
         WHERE date >= date('now', '-8 days') AND date < date('now')
         ORDER BY date
     """).fetchall()
@@ -156,17 +156,36 @@ def check_savings_anomaly(conn):
     igar = rows[-1]
     forra_7 = rows[:-1]
     snitt = sum(r["total_kr"] or 0 for r in forra_7) / len(forra_7)
+    snitt_sol = sum(r["sol_kwh"] or 0 for r in forra_7) / len(forra_7)
     if snitt < 10:
         return
+    # Mörkerdämpning: för lite sol i veckan för att skilja fel fran vader -> hoppa
+    if snitt_sol < 2:
+        resolve_alerts(conn, "savings_low")
+        return
     igar_kr = igar["total_kr"] or 0
+    igar_sol = igar["sol_kwh"] or 0
     diff_procent = (igar_kr - snitt) / snitt * 100
-    if diff_procent < -70:
+    # Larma bara om lag besparing INTE forklaras av lite sol igar
+    if diff_procent < -70 and igar_sol >= 0.5 * snitt_sol:
         raise_alert(conn, "savings_low", "warning",
                     "Igar-besparing " + str(int(diff_procent)) + " procent under snitt",
                     "Igar (" + igar["date"] + "): " + str(round(igar_kr, 0)) + " kr. "
-                    "7-dagars snitt: " + str(round(snitt, 0)) + " kr.")
+                    "7-dagars snitt: " + str(round(snitt, 0)) + " kr. "
+                    "Sol igar: " + str(round(igar_sol, 1)) + " kWh (snitt " + str(round(snitt_sol, 1)) + ").")
     else:
         resolve_alerts(conn, "savings_low")
+
+
+def auto_expire_alerts(conn, alert_type="savings_low", days=3):
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    n = conn.execute(
+        "UPDATE alerts SET resolved_at = ? "
+        "WHERE alert_type = ? AND resolved_at IS NULL AND ts_utc < ?",
+        (now_utc(), alert_type, cutoff)
+    ).rowcount
+    if n > 0:
+        print("OK: auto-loste", n, alert_type, "larm aldre an", days, "dygn")
 
 
 def main():
@@ -175,6 +194,7 @@ def main():
         check_realtime_freshness(conn)
         check_5min_freshness(conn)
         check_savings_anomaly(conn)
+        auto_expire_alerts(conn)
     print("=== Watchdog klar ===")
 
 
