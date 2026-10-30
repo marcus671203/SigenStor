@@ -1,9 +1,7 @@
 name: Daglig aggregering
 
 on:
-  schedule:
-    - cron: '15 2 * * *'
-  workflow_dispatch:
+  workflow_dispatch:   # schema avstangt – VPS:en driver all data/beräkning
 
 permissions:
   contents: write
