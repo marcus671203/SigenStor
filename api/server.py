@@ -11,6 +11,9 @@ from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 import uuid
+import functools
+import threading
+import time
 import subprocess
 import smtplib
 import ssl
@@ -547,7 +550,45 @@ def alerts():
 
 
 
+# --- Cache för tunga EVDC-beräkningar -------------------------------------
+# evdc-cost och evdc-history räknar igenom hela energy_5min_v2 (3-4 s var,
+# 10-13 s när båda körs samtidigt). Resultatet ändras bara när ny data kommer
+# in, så det sparas och räknas om först när tabellen har ändrats, dygnet har
+# bytts eller CACHE_MAX_AGE har gått.
+CACHE_MAX_AGE = 3600  # sekunder, skydd mot ändrade värden i befintliga rader
+_cache = {}
+_cache_locks = {"evdc_cost": threading.Lock(), "evdc_history": threading.Lock()}
+
+
+def _data_version():
+    with connect() as conn:
+        last_ts, n = conn.execute(
+            "SELECT MAX(ts_local), COUNT(*) FROM energy_5min_v2").fetchone()
+    return (last_ts, n, datetime.now(TZ).date().isoformat())
+
+
+def cached_until_new_data(fn):
+    name = fn.__name__
+
+    @functools.wraps(fn)
+    def wrapper():
+        version = _data_version()
+        hit = _cache.get(name)
+        if hit and hit[0] == version and time.monotonic() - hit[1] < CACHE_MAX_AGE:
+            return hit[2]
+        # Bara en beräkning åt gången per endpoint; den som väntar får resultatet
+        with _cache_locks[name]:
+            hit = _cache.get(name)
+            if hit and hit[0] == version and time.monotonic() - hit[1] < CACHE_MAX_AGE:
+                return hit[2]
+            result = fn()
+            _cache[name] = (version, time.monotonic(), result)
+            return result
+    return wrapper
+
+
 @app.get("/api/evdc-cost")
+@cached_until_new_data
 def evdc_cost():
     """EVDC-laddkostnad denna manad med LIFO-buffer for bat och EVDC."""
     import json
@@ -681,6 +722,7 @@ def evdc_cost():
     }
 
 @app.get("/api/evdc-history")
+@cached_until_new_data
 def evdc_history():
     """EVDC-laddning per manad, senaste 12 manaderna med LIFO-buffer."""
     import json
